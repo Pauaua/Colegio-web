@@ -21,7 +21,8 @@
     "build": "npm run build -w backend && npm run build:web",
     "typecheck": "npm run typecheck -w backend && npm run typecheck -w app",
     "lint": "npm run lint -w backend && npm run lint -w app",
-    "test": "npm test -w backend"
+    "test": "npm test -w backend",
+    "build:artifact": "node scripts/build-artifact.mjs"
   },
   "devDependencies": {
     "concurrently": "^10.0.5"

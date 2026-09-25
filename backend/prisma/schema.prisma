@@ -3,6 +3,8 @@
 
 generator client {
   provider = "prisma-client-js"
+  // native: desarrollo local (y el contenedor de build). rhel-openssl-3.0.x: Amazon Linux 2023 en EC2.
+  binaryTargets = ["native", "rhel-openssl-3.0.x"]
 }
 
 datasource db {

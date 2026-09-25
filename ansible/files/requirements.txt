@@ -1,0 +1,3 @@
+# app_referencia.py funciona solo con la librería estándar (SQLite).
+# PyMySQL solo se necesita para el modo MySQL (cuando se define DB_HOST).
+PyMySQL>=1.1,<2

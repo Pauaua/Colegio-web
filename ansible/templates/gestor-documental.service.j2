@@ -1,0 +1,24 @@
+# {{ ansible_managed }}
+[Unit]
+Description=Gestor Documental Chorombo Bajo (API Node.js + app web)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User={{ app_user }}
+Group={{ app_user }}
+WorkingDirectory={{ app_dir }}/backend
+EnvironmentFile={{ env_dir }}/app.env
+ExecStart={{ node_bin }} dist/src/server.js
+Restart=always
+RestartSec=5
+# Deja terminar las solicitudes en curso (deregistration delay del ALB: 30 s).
+TimeoutStopSec=30
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=full
+ReadWritePaths={{ log_dir }}
+
+[Install]
+WantedBy=multi-user.target

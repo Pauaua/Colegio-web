@@ -23,3 +23,5 @@ tests/__pycache__/
 tests/.pytest_cache/
 tests/*.db
 .venv/
+.artifact/
+.ansible/

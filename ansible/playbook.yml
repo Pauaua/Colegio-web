@@ -1,0 +1,349 @@
+# -----------------------------------------------------------------------------
+# Gestor Documental — Escuela Básica G-733 Chorombo Bajo
+# Instalación y configuración del servicio en las instancias EC2 del Auto Scaling Group.
+#
+#   ansible-playbook -i inventory.ini playbook.yml \
+#     --extra-vars "s3_bucket=<bucket> db_host=<endpoint-rds> db_password=<clave>"
+#
+# Tags: base, app, referencia, cloudwatch, verify
+#   - modo=principal (por defecto): API Node.js + app web desde files/gestor-documental.tar.gz
+#   - modo=referencia: solo app_referencia.py (respaldo)   --extra-vars "modo=referencia"
+# Es idempotente: se puede volver a ejecutar sin efectos no deseados.
+# -----------------------------------------------------------------------------
+
+- name: Desplegar el Gestor Documental en las instancias EC2
+  hosts: gestor_documental
+  become: true
+  gather_facts: true
+
+  vars:
+    modo: principal
+    app_user: gestor
+    app_dir: /opt/gestor-documental
+    log_dir: /var/log/gestor-documental
+    env_dir: /etc/gestor-documental
+    app_port: 8000
+    aws_region: us-east-1
+    project_name: chorombo-bajo
+    db_name: gestor_documental
+    db_user: gestor_admin
+    db_port: 3306
+    s3_bucket: ""
+    db_host: ""
+    db_password: ""
+    # Si no se entrega, se lee de SSM Parameter Store (/chorombo-bajo/jwt_secret, lo crea Terraform)
+    # para que todas las instancias firmen y verifiquen los JWT con el mismo secreto.
+    jwt_secret: ""
+    run_seed: true
+    artifact_file: gestor-documental.tar.gz
+    artifact_s3_key: artifacts/gestor-documental-latest.tar.gz
+    node_bin: /usr/local/bin/node
+    cloudwatch_agent_config: /opt/aws/amazon-cloudwatch-agent/etc/amazon-cloudwatch-agent.json
+
+  pre_tasks:
+    - name: Verificar las variables obligatorias
+      ansible.builtin.assert:
+        that:
+          - s3_bucket | length > 0
+          - db_host | length > 0
+          - db_password | length > 0
+          - modo in ['principal', 'referencia']
+        fail_msg: >-
+          Faltan variables: ejecute con
+          --extra-vars "s3_bucket=<bucket> db_host=<endpoint-rds> db_password=<clave>"
+        quiet: true
+      tags: [always]
+
+    - name: Obtener el secreto JWT compartido desde SSM Parameter Store
+      ansible.builtin.command: >-
+        aws ssm get-parameter --region {{ aws_region }}
+        --name /{{ project_name }}/jwt_secret --with-decryption
+        --query Parameter.Value --output text
+      register: jwt_from_ssm
+      changed_when: false
+      no_log: true
+      run_once: true
+      when: jwt_secret | length == 0
+      tags: [always]
+
+    - name: Definir el secreto JWT para todas las instancias
+      ansible.builtin.set_fact:
+        app_jwt_secret: "{{ jwt_secret if jwt_secret | length > 0 else jwt_from_ssm.stdout }}"
+      no_log: true
+      tags: [always]
+
+  handlers:
+    - name: Reiniciar gestor-documental
+      ansible.builtin.systemd:
+        name: gestor-documental
+        state: restarted
+        daemon_reload: true
+      when: modo == 'principal'
+
+    - name: Reiniciar gestor-referencia
+      ansible.builtin.systemd:
+        name: gestor-referencia
+        state: restarted
+        daemon_reload: true
+      when: modo == 'referencia'
+
+    - name: Recargar CloudWatch Agent
+      ansible.builtin.command: >-
+        /opt/aws/amazon-cloudwatch-agent/bin/amazon-cloudwatch-agent-ctl
+        -a fetch-config -m ec2 -s -c file:{{ cloudwatch_agent_config }}
+      changed_when: true
+
+  tasks:
+    # ------------------------------------------------------------------ base ---
+    - name: Instalar Node.js 20, Python 3 y dependencias del sistema
+      ansible.builtin.dnf:
+        name:
+          - nodejs20
+          - nodejs20-npm
+          - python3
+          - python3-pip
+          - tar
+          - gzip
+        state: present
+      tags: [base]
+
+    - name: Exponer node, npm y npx de Node.js 20 en /usr/local/bin
+      ansible.builtin.file:
+        src: "/usr/bin/{{ item }}-20"
+        dest: "/usr/local/bin/{{ item }}"
+        state: link
+      loop: [node, npm, npx]
+      tags: [base]
+
+    - name: Instalar PyMySQL (modo MySQL del backend de referencia)
+      ansible.builtin.pip:
+        name: "PyMySQL>=1.1,<2"
+        executable: pip3
+      tags: [base]
+
+    - name: Crear el usuario de sistema del servicio
+      ansible.builtin.user:
+        name: "{{ app_user }}"
+        system: true
+        home: "{{ app_dir }}"
+        create_home: false
+        shell: /sbin/nologin
+      tags: [base]
+
+    - name: Crear los directorios de la aplicación, logs y configuración
+      ansible.builtin.file:
+        path: "{{ item.path }}"
+        state: directory
+        owner: "{{ item.owner }}"
+        group: "{{ app_user }}"
+        mode: "{{ item.mode }}"
+      loop:
+        - { path: "{{ app_dir }}", owner: "{{ app_user }}", mode: "0755" }
+        - { path: "{{ log_dir }}", owner: "{{ app_user }}", mode: "0755" }
+        - { path: "{{ env_dir }}", owner: root, mode: "0750" }
+      tags: [base]
+
+    - name: Renderizar las variables de entorno (app.env)
+      ansible.builtin.template:
+        src: templates/app.env.j2
+        dest: "{{ env_dir }}/app.env"
+        owner: root
+        group: "{{ app_user }}"
+        mode: "0640"
+      no_log: true
+      notify:
+        - Reiniciar gestor-documental
+        - Reiniciar gestor-referencia
+      tags: [base, app, referencia]
+
+    # ------------------------------------------------------------------- app ---
+    - name: Aplicación principal (API Node.js + app web)
+      when: modo == 'principal'
+      tags: [app]
+      block:
+        - name: Copiar el artefacto a la instancia
+          ansible.builtin.copy:
+            src: "files/{{ artifact_file }}"
+            dest: "/tmp/{{ artifact_file }}"
+            mode: "0644"
+          register: artifact
+
+        - name: Limpiar la versión anterior del código compilado
+          ansible.builtin.file:
+            path: "{{ item }}"
+            state: absent
+          loop:
+            - "{{ app_dir }}/backend/dist"
+            - "{{ app_dir }}/app/dist"
+          when: artifact.changed
+
+        - name: Descomprimir el artefacto
+          ansible.builtin.unarchive:
+            src: "/tmp/{{ artifact_file }}"
+            dest: "{{ app_dir }}"
+            remote_src: true
+            owner: "{{ app_user }}"
+            group: "{{ app_user }}"
+          when: artifact.changed
+          notify: Reiniciar gestor-documental
+
+        - name: Instalar dependencias de producción (npm ci --omit=dev)
+          ansible.builtin.command:
+            cmd: npm ci --omit=dev --no-audit --no-fund
+            chdir: "{{ app_dir }}/backend"
+          become_user: "{{ app_user }}"
+          environment:
+            PATH: "/usr/local/bin:{{ ansible_env.PATH }}"
+            HOME: "{{ app_dir }}"
+            npm_config_cache: "/tmp/npm-cache-{{ app_user }}"
+          when: artifact.changed
+          changed_when: true
+          notify: Reiniciar gestor-documental
+
+        - name: Publicar el artefacto en S3 para las instancias nuevas del ASG
+          ansible.builtin.command: >-
+            aws s3 cp /tmp/{{ artifact_file }} s3://{{ s3_bucket }}/{{ artifact_s3_key }} --region {{ aws_region }}
+          run_once: true
+          when: artifact.changed
+          changed_when: true
+
+        - name: Aplicar las migraciones de la base (una sola vez)
+          ansible.builtin.command:
+            cmd: npx prisma migrate deploy
+            chdir: "{{ app_dir }}/backend"
+          environment: &app_env
+            PATH: "/usr/local/bin:{{ ansible_env.PATH }}"
+            DATABASE_URL: "mysql://{{ db_user }}:{{ db_password | urlencode }}@{{ db_host }}:{{ db_port }}/{{ db_name }}"
+            JWT_SECRET: "{{ app_jwt_secret }}"
+            S3_BUCKET: "{{ s3_bucket }}"
+            AWS_REGION: "{{ aws_region }}"
+          run_once: true
+          register: migrate
+          changed_when: "'No pending migrations' not in migrate.stdout"
+
+        - name: Cargar los datos de ejemplo (seed, una sola vez)
+          ansible.builtin.command:
+            cmd: "{{ node_bin }} dist/prisma/seed.js"
+            chdir: "{{ app_dir }}/backend"
+          environment: *app_env
+          run_once: true
+          when: run_seed | bool
+          register: seed
+          changed_when: "'documentos nuevos' in seed.stdout and ' 0 documentos nuevos' not in seed.stdout"
+
+        - name: Instalar la unidad systemd gestor-documental
+          ansible.builtin.template:
+            src: templates/gestor-documental.service.j2
+            dest: /etc/systemd/system/gestor-documental.service
+            mode: "0644"
+          notify: Reiniciar gestor-documental
+
+        - name: Detener el backend de referencia si estaba activo
+          ansible.builtin.systemd:
+            name: gestor-referencia
+            state: stopped
+            enabled: false
+          failed_when: false
+
+        - name: Habilitar e iniciar gestor-documental
+          ansible.builtin.systemd:
+            name: gestor-documental
+            enabled: true
+            state: started
+            daemon_reload: true
+
+    # ------------------------------------------------------------ referencia ---
+    - name: Backend de referencia (app_referencia.py)
+      tags: [referencia]
+      block:
+        - name: Crear el directorio del backend de referencia
+          ansible.builtin.file:
+            path: "{{ app_dir }}/referencia"
+            state: directory
+            owner: "{{ app_user }}"
+            group: "{{ app_user }}"
+            mode: "0755"
+
+        - name: Copiar app_referencia.py y requirements.txt
+          ansible.builtin.copy:
+            src: "files/{{ item }}"
+            dest: "{{ app_dir }}/referencia/{{ item }}"
+            owner: "{{ app_user }}"
+            group: "{{ app_user }}"
+            mode: "0644"
+          loop: [app_referencia.py, requirements.txt]
+          notify: Reiniciar gestor-referencia
+
+        - name: Publicar app_referencia.py en S3 (respaldo de las instancias nuevas)
+          ansible.builtin.command: >-
+            aws s3 cp {{ app_dir }}/referencia/app_referencia.py s3://{{ s3_bucket }}/artifacts/app_referencia.py --region {{ aws_region }}
+          run_once: true
+          changed_when: true
+          when: modo == 'referencia'
+
+        - name: Instalar la unidad systemd gestor-referencia
+          ansible.builtin.template:
+            src: templates/gestor-referencia.service.j2
+            dest: /etc/systemd/system/gestor-referencia.service
+            mode: "0644"
+          notify: Reiniciar gestor-referencia
+
+        - name: Activar el backend de referencia (modo=referencia)
+          when: modo == 'referencia'
+          block:
+            - name: Detener la aplicación principal
+              ansible.builtin.systemd:
+                name: gestor-documental
+                state: stopped
+                enabled: false
+              failed_when: false
+
+            - name: Habilitar e iniciar gestor-referencia
+              ansible.builtin.systemd:
+                name: gestor-referencia
+                enabled: true
+                state: started
+                daemon_reload: true
+
+    # ------------------------------------------------------------ cloudwatch ---
+    - name: Instalar CloudWatch Agent
+      ansible.builtin.dnf:
+        name: amazon-cloudwatch-agent
+        state: present
+      tags: [cloudwatch]
+
+    - name: Configurar CloudWatch Agent (logs de la app, memoria y disco)
+      ansible.builtin.copy:
+        src: files/cloudwatch-agent-config.json
+        dest: "{{ cloudwatch_agent_config }}"
+        mode: "0644"
+      notify: Recargar CloudWatch Agent
+      tags: [cloudwatch]
+
+    - name: Asegurar que CloudWatch Agent esté en ejecución
+      ansible.builtin.systemd:
+        name: amazon-cloudwatch-agent
+        enabled: true
+        state: started
+      tags: [cloudwatch]
+
+    - name: Aplicar los reinicios pendientes antes de verificar
+      ansible.builtin.meta: flush_handlers
+      tags: [always]
+
+    # ---------------------------------------------------------------- verify ---
+    - name: Verificar http://localhost:{{ app_port }}/health
+      ansible.builtin.uri:
+        url: "http://localhost:{{ app_port }}/health"
+        status_code: 200
+        return_content: true
+      register: health
+      until: health.status == 200
+      retries: 20
+      delay: 6
+      tags: [verify]
+
+    - name: Mostrar el resultado del health check
+      ansible.builtin.debug:
+        msg: "{{ inventory_hostname }}: status={{ health.json.status }} db={{ health.json.db }} instance={{ health.json.instance }}"
+      tags: [verify]

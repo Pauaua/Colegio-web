@@ -1,0 +1,20 @@
+# {{ ansible_managed }}
+[Unit]
+Description=Gestor Documental - backend de referencia (Python)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User={{ app_user }}
+Group={{ app_user }}
+WorkingDirectory={{ app_dir }}/referencia
+EnvironmentFile={{ env_dir }}/app.env
+ExecStart=/usr/bin/python3 {{ app_dir }}/referencia/app_referencia.py
+Restart=always
+RestartSec=5
+NoNewPrivileges=true
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target
