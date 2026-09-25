@@ -1,4 +1,4 @@
-import { GetObjectCommand, PutObjectCommand, S3Client } from '@aws-sdk/client-s3';
+import { GetObjectCommand, HeadObjectCommand, PutObjectCommand, S3Client } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import { env } from '../config/env';
 
@@ -23,6 +23,18 @@ const presignClient = env.S3_PUBLIC_ENDPOINT ? buildClient(env.S3_PUBLIC_ENDPOIN
 
 export async function putObject(key: string, body: Buffer, contentType: string): Promise<void> {
   await s3.send(new PutObjectCommand({ Bucket: env.S3_BUCKET, Key: key, Body: body, ContentType: contentType }));
+}
+
+/** Metadatos del objeto, o null si no existe. */
+export async function headObject(key: string): Promise<{ size: number; contentType?: string } | null> {
+  try {
+    const res = await s3.send(new HeadObjectCommand({ Bucket: env.S3_BUCKET, Key: key }));
+    return { size: res.ContentLength ?? 0, contentType: res.ContentType };
+  } catch (err) {
+    const status = (err as { $metadata?: { httpStatusCode?: number } }).$metadata?.httpStatusCode;
+    if (status === 404 || (err as Error).name === 'NotFound') return null;
+    throw err;
+  }
 }
 
 export function presignUpload(key: string, contentType: string): Promise<string> {

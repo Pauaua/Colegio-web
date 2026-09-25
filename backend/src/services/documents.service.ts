@@ -1,7 +1,7 @@
 import { Prisma, type DocumentStatus, type Role } from '@prisma/client';
 import { recordAudit } from '../lib/audit';
-import { badRequest } from '../lib/http-error';
-import { buildDocumentWhere, isDirective, type AuthUser } from '../lib/permissions';
+import { badRequest, forbidden, notFound } from '../lib/http-error';
+import { buildDocumentWhere, can, canViewDocument, isDirective, type AuthUser } from '../lib/permissions';
 import { prisma } from '../lib/prisma';
 
 /** Prefijo del folio por tipo de documento (p. ej. ACT-2026-0003). */
@@ -217,4 +217,100 @@ export function toApiDocument(doc: DocumentWithRelations) {
     createdAt: doc.createdAt.toISOString(),
     updatedAt: doc.updatedAt.toISOString(),
   };
+}
+
+/**
+ * Obtiene un documento aplicando las reglas de acceso:
+ * 404 si no existe o está eliminado; 403 si existe pero el usuario no tiene acceso.
+ */
+export async function getDocumentForUser(user: AuthUser, id: number): Promise<DocumentWithRelations> {
+  const doc = await prisma.document.findFirst({ where: { id, isDeleted: false }, include: documentInclude });
+  if (!doc) throw notFound('Documento no encontrado');
+  if (!(await canViewDocument(user, doc))) throw forbidden('No tiene acceso a este documento');
+  return doc;
+}
+
+export interface UpdateDocumentInput {
+  title?: string;
+  description?: string | null;
+  type?: string | number;
+  documentDate?: Date;
+  folioNumber?: string;
+  visibility?: Role[];
+  recipientIds?: number[];
+  courseIds?: number[];
+  requiresAcknowledgement?: boolean;
+  file?: StoredFile;
+}
+
+export async function updateDocument(user: AuthUser, id: number, input: UpdateDocumentInput): Promise<DocumentWithRelations> {
+  const current = await getDocumentForUser(user, id);
+  if (!can(user, 'document:update', current)) throw forbidden('Solo puede editar sus propios documentos');
+
+  const type = input.type !== undefined ? await resolveDocumentType(input.type) : null;
+  const recipientIds = input.recipientIds ? [...new Set(input.recipientIds)] : undefined;
+  const courseIds = input.courseIds ? [...new Set(input.courseIds)] : undefined;
+  await assertRecipientsExist(recipientIds ?? [], courseIds ?? []);
+
+  const updated = await prisma.$transaction(async (tx) => {
+    if (input.visibility) {
+      const visibility = [...new Set(input.visibility)].filter((r) => !isDirective(r));
+      await tx.documentVisibility.deleteMany({ where: { documentId: id } });
+      await tx.documentVisibility.createMany({ data: visibility.map((role) => ({ documentId: id, role })) });
+    }
+    if (recipientIds) {
+      // Se conservan los acuses de los destinatarios que se mantienen.
+      await tx.documentRecipient.deleteMany({ where: { documentId: id, userId: { notIn: recipientIds } } });
+      const existing = new Set(current.recipients.map((r) => r.userId));
+      const added = recipientIds.filter((u) => !existing.has(u));
+      await tx.documentRecipient.createMany({ data: added.map((userId) => ({ documentId: id, userId })) });
+    }
+    if (courseIds) {
+      await tx.documentCourse.deleteMany({ where: { documentId: id } });
+      await tx.documentCourse.createMany({ data: courseIds.map((courseId) => ({ documentId: id, courseId })) });
+    }
+    return tx.document.update({
+      where: { id },
+      data: {
+        title: input.title?.trim(),
+        description: input.description === undefined ? undefined : input.description?.trim() || null,
+        documentTypeId: type?.id,
+        documentDate: input.documentDate,
+        folioYear: input.documentDate?.getUTCFullYear(),
+        folioNumber: input.folioNumber?.trim(),
+        requiresAcknowledgement: input.requiresAcknowledgement,
+        ...(input.file ?? {}),
+      },
+      include: documentInclude,
+    });
+  });
+
+  await recordAudit({
+    userId: user.id,
+    action: 'DOCUMENT_UPDATE',
+    entity: 'Document',
+    entityId: id,
+    metadata: { fields: Object.keys(input) },
+  });
+  return updated;
+}
+
+export async function setArchived(user: AuthUser, id: number, archived: boolean): Promise<DocumentWithRelations> {
+  const current = await getDocumentForUser(user, id);
+  if (!can(user, 'document:archive', current)) throw forbidden('Solo puede archivar sus propios documentos');
+  const updated = await prisma.document.update({
+    where: { id },
+    data: { status: archived ? 'ARCHIVADO' : 'VIGENTE' },
+    include: documentInclude,
+  });
+  await recordAudit({ userId: user.id, action: archived ? 'DOCUMENT_ARCHIVE' : 'DOCUMENT_UNARCHIVE', entity: 'Document', entityId: id });
+  return updated;
+}
+
+/** Borrado lógico: el registro y el archivo se conservan para auditoría (S3 mantiene además las versiones). */
+export async function softDeleteDocument(user: AuthUser, id: number): Promise<void> {
+  if (!can(user, 'document:delete')) throw forbidden('Solo la dirección o el sostenedor pueden eliminar documentos');
+  await getDocumentForUser(user, id);
+  await prisma.document.update({ where: { id }, data: { isDeleted: true } });
+  await recordAudit({ userId: user.id, action: 'DOCUMENT_DELETE', entity: 'Document', entityId: id });
 }

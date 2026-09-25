@@ -28,9 +28,19 @@ export function errorHandler(err: unknown, req: Request, res: Response, _next: N
     res.status(status).json({ error: err.code, message: err.code === 'LIMIT_FILE_SIZE' ? 'El archivo supera los 10 MB' : err.message });
     return;
   }
-  if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === 'P2002') {
-    res.status(409).json({ error: 'CONFLICT', message: 'Ya existe un registro con esos datos únicos', details: err.meta });
-    return;
+  if (err instanceof Prisma.PrismaClientKnownRequestError) {
+    if (err.code === 'P2002') {
+      res.status(409).json({ error: 'CONFLICT', message: 'Ya existe un registro con esos datos únicos', details: err.meta });
+      return;
+    }
+    if (err.code === 'P2025') {
+      res.status(404).json({ error: 'NOT_FOUND', message: 'Recurso no encontrado' });
+      return;
+    }
+    if (err.code === 'P2003') {
+      res.status(409).json({ error: 'CONFLICT', message: 'El registro está referenciado por otros datos' });
+      return;
+    }
   }
   if (err instanceof SyntaxError && 'body' in err) {
     res.status(400).json({ error: 'INVALID_JSON', message: 'El cuerpo de la solicitud no es JSON válido' });
