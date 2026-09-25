@@ -227,6 +227,16 @@ def next_folio(tipo: str, year: str) -> str:
 def init_db() -> None:
     for statement in SCHEMA:
         db.execute(statement)
+    try:
+        _seed()
+    except Exception as exc:  # noqa: BLE001 - otra instancia pudo sembrar al mismo tiempo (restricción única)
+        if db.one("SELECT id FROM ref_usuarios LIMIT 1") is None:
+            raise
+        log("Seed omitido: la base ya fue inicializada por otra instancia", error=type(exc).__name__)
+    log("Base lista", engine=db.kind)
+
+
+def _seed() -> None:
     if not db.one("SELECT id FROM ref_usuarios LIMIT 1"):
         for username, email, nombre, rol in SEED_USERS:
             db.execute(
@@ -243,7 +253,6 @@ def init_db() -> None:
                    destinatarios, requiere_acuse, creado_en) VALUES (?, ?, ?, ?, ?, ?, 'VIGENTE', ?, ?, ?, ?)""",
                 (titulo, tipo, fecha, next_folio(tipo, fecha[:4]), None, author, ",".join(visibilidad), ",".join(recipient_ids), int(acuse), now_iso()),
             )
-    log("Base lista", engine=db.kind)
 
 
 # =============================================================================

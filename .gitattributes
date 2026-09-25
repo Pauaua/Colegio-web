@@ -3,3 +3,6 @@
 *.pdf binary
 *.png binary
 *.tar.gz binary
+# Informe generado por JMeter (terceros): se guarda tal cual
+tests/informe_html/** -text
+tests/*.jtl -text

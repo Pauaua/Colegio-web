@@ -10,7 +10,7 @@ import { can } from '../../lib/permissions';
 import { prisma } from '../../lib/prisma';
 import { passwordSchema } from '../../lib/validation';
 import { currentUser, requireAuth } from '../../middleware/auth';
-import { loginLimiter } from '../../middleware/rate-limit';
+import { clearFailedLogins, registerFailedLogin, rejectIfLoginLocked } from '../../middleware/rate-limit';
 import { hashPassword, issueSession, login, revokeRefreshToken, rotateRefreshToken, toPublicUser } from '../../services/auth.service';
 
 export const authRouter = Router();
@@ -20,10 +20,14 @@ const loginSchema = z.object({
   password: z.string().min(1, 'Ingrese su contraseña'),
 });
 
-authRouter.post('/login', loginLimiter, async (req, res) => {
+authRouter.post('/login', rejectIfLoginLocked, async (req, res) => {
   const { username, password } = loginSchema.parse(req.body ?? {});
   const result = await login(username, password, { ip: req.ip, userAgent: req.get('user-agent') });
-  if (result.kind === 'invalid') throw unauthorized('Usuario o contraseña incorrectos');
+  if (result.kind === 'invalid') {
+    await registerFailedLogin(req);
+    throw unauthorized('Usuario o contraseña incorrectos');
+  }
+  await clearFailedLogins(req);
   if (result.kind === 'mfa_required') {
     res.json({ mfaRequired: true, mfaToken: result.mfaToken });
     return;
@@ -34,7 +38,7 @@ authRouter.post('/login', loginLimiter, async (req, res) => {
 // --- Segundo paso del login con MFA ------------------------------------------------------------
 const mfaVerifySchema = z.object({ mfaToken: z.string().min(1), code: z.string().trim() });
 
-authRouter.post('/mfa/verify', loginLimiter, async (req, res) => {
+authRouter.post('/mfa/verify', rejectIfLoginLocked, async (req, res) => {
   const { mfaToken, code } = mfaVerifySchema.parse(req.body ?? {});
   const payload = verifyMfaToken(mfaToken);
   if (!payload) throw unauthorized('La sesión de verificación expiró; vuelva a iniciar sesión');
@@ -43,6 +47,7 @@ authRouter.post('/mfa/verify', loginLimiter, async (req, res) => {
   if (!user || !user.isActive || !user.mfaEnabled || !user.mfaSecret) throw unauthorized('MFA no disponible');
   if (!verifyTotp(decrypt(user.mfaSecret), code)) {
     await recordAudit({ userId: user.id, action: 'MFA_FAILED', entity: 'User', entityId: user.id });
+    await registerFailedLogin(req);
     throw unauthorized('Código incorrecto');
   }
   const session = await issueSession(user);

@@ -1,0 +1,229 @@
+{
+  "proyecto": "Gestor Documental — Escuela Básica G-733 Chorombo Bajo",
+  "ejecutado_en": "2026-09-25T14:25:18.963605+00:00",
+  "resultado": "APROBADO",
+  "modo": "simulacion",
+  "alarmas_declaradas": {
+    "cpu-alta": {
+      "recurso": "cpu_high",
+      "metric": "CPUUtilization",
+      "namespace": "AWS/EC2",
+      "threshold": 70.0,
+      "period": 60,
+      "evaluation_periods": 3,
+      "comparison": "GreaterThanThreshold",
+      "alarm_actions": true,
+      "ok_actions": true
+    },
+    "hosts-no-saludables": {
+      "recurso": "hosts_unhealthy",
+      "metric": "UnHealthyHostCount",
+      "namespace": "AWS/ApplicationELB",
+      "threshold": 0.0,
+      "period": 60,
+      "evaluation_periods": 1,
+      "comparison": "GreaterThanThreshold",
+      "alarm_actions": true,
+      "ok_actions": true
+    },
+    "db-conexiones-altas": {
+      "recurso": "db_connections_high",
+      "metric": "DatabaseConnections",
+      "namespace": "AWS/RDS",
+      "threshold": 40.0,
+      "period": 60,
+      "evaluation_periods": 3,
+      "comparison": "GreaterThanThreshold",
+      "alarm_actions": true,
+      "ok_actions": true
+    }
+  },
+  "verificaciones": [
+    {
+      "verificacion": "Cantidad de alarmas",
+      "esperado": 3,
+      "obtenido": 3,
+      "ok": true
+    },
+    {
+      "verificacion": "cpu-alta · metric",
+      "esperado": "CPUUtilization",
+      "obtenido": "CPUUtilization",
+      "ok": true
+    },
+    {
+      "verificacion": "cpu-alta · namespace",
+      "esperado": "AWS/EC2",
+      "obtenido": "AWS/EC2",
+      "ok": true
+    },
+    {
+      "verificacion": "cpu-alta · threshold",
+      "esperado": 70.0,
+      "obtenido": 70.0,
+      "ok": true
+    },
+    {
+      "verificacion": "cpu-alta · period",
+      "esperado": 60,
+      "obtenido": 60,
+      "ok": true
+    },
+    {
+      "verificacion": "cpu-alta · evaluation_periods",
+      "esperado": 3,
+      "obtenido": 3,
+      "ok": true
+    },
+    {
+      "verificacion": "cpu-alta · comparación",
+      "esperado": "GreaterThanThreshold",
+      "obtenido": "GreaterThanThreshold",
+      "ok": true
+    },
+    {
+      "verificacion": "cpu-alta · alarm_actions → SNS",
+      "esperado": true,
+      "obtenido": true,
+      "ok": true
+    },
+    {
+      "verificacion": "cpu-alta · ok_actions → SNS",
+      "esperado": true,
+      "obtenido": true,
+      "ok": true
+    },
+    {
+      "verificacion": "hosts-no-saludables · metric",
+      "esperado": "UnHealthyHostCount",
+      "obtenido": "UnHealthyHostCount",
+      "ok": true
+    },
+    {
+      "verificacion": "hosts-no-saludables · namespace",
+      "esperado": "AWS/ApplicationELB",
+      "obtenido": "AWS/ApplicationELB",
+      "ok": true
+    },
+    {
+      "verificacion": "hosts-no-saludables · threshold",
+      "esperado": 0.0,
+      "obtenido": 0.0,
+      "ok": true
+    },
+    {
+      "verificacion": "hosts-no-saludables · period",
+      "esperado": 60,
+      "obtenido": 60,
+      "ok": true
+    },
+    {
+      "verificacion": "hosts-no-saludables · evaluation_periods",
+      "esperado": 1,
+      "obtenido": 1,
+      "ok": true
+    },
+    {
+      "verificacion": "hosts-no-saludables · comparación",
+      "esperado": "GreaterThanThreshold",
+      "obtenido": "GreaterThanThreshold",
+      "ok": true
+    },
+    {
+      "verificacion": "hosts-no-saludables · alarm_actions → SNS",
+      "esperado": true,
+      "obtenido": true,
+      "ok": true
+    },
+    {
+      "verificacion": "hosts-no-saludables · ok_actions → SNS",
+      "esperado": true,
+      "obtenido": true,
+      "ok": true
+    },
+    {
+      "verificacion": "db-conexiones-altas · metric",
+      "esperado": "DatabaseConnections",
+      "obtenido": "DatabaseConnections",
+      "ok": true
+    },
+    {
+      "verificacion": "db-conexiones-altas · namespace",
+      "esperado": "AWS/RDS",
+      "obtenido": "AWS/RDS",
+      "ok": true
+    },
+    {
+      "verificacion": "db-conexiones-altas · threshold",
+      "esperado": 40.0,
+      "obtenido": 40.0,
+      "ok": true
+    },
+    {
+      "verificacion": "db-conexiones-altas · period",
+      "esperado": 60,
+      "obtenido": 60,
+      "ok": true
+    },
+    {
+      "verificacion": "db-conexiones-altas · evaluation_periods",
+      "esperado": 3,
+      "obtenido": 3,
+      "ok": true
+    },
+    {
+      "verificacion": "db-conexiones-altas · comparación",
+      "esperado": "GreaterThanThreshold",
+      "obtenido": "GreaterThanThreshold",
+      "ok": true
+    },
+    {
+      "verificacion": "db-conexiones-altas · alarm_actions → SNS",
+      "esperado": true,
+      "obtenido": true,
+      "ok": true
+    },
+    {
+      "verificacion": "db-conexiones-altas · ok_actions → SNS",
+      "esperado": true,
+      "obtenido": true,
+      "ok": true
+    },
+    {
+      "verificacion": "hosts-no-saludables · recurso aws_cloudwatch_metric_alarm.hosts_unhealthy",
+      "esperado": "hosts_unhealthy",
+      "obtenido": "hosts_unhealthy",
+      "ok": true
+    },
+    {
+      "verificacion": "Tópico SNS aws_sns_topic.alerts",
+      "esperado": true,
+      "obtenido": true,
+      "ok": true
+    },
+    {
+      "verificacion": "Suscripción por email a var.alert_email",
+      "esperado": true,
+      "obtenido": true,
+      "ok": true
+    },
+    {
+      "verificacion": "Dashboard chorombo-bajo-gestor-documental",
+      "esperado": true,
+      "obtenido": true,
+      "ok": true
+    },
+    {
+      "verificacion": "Dashboard · paneles",
+      "esperado": 4,
+      "obtenido": 4,
+      "ok": true
+    },
+    {
+      "verificacion": "Log group /chorombo/gestor-documental (14 días)",
+      "esperado": true,
+      "obtenido": true,
+      "ok": true
+    }
+  ]
+}

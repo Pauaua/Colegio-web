@@ -1,0 +1,131 @@
+{
+  "proyecto": "Gestor Documental — Escuela Básica G-733 Chorombo Bajo",
+  "ejecutado_en": "2026-09-25T14:25:18.655393+00:00",
+  "resultado": "APROBADO",
+  "modo": "simulacion",
+  "valores_declarados": {
+    "instance_type": "t3.micro",
+    "asg_min": "2",
+    "asg_desired": "2",
+    "asg_max": "4",
+    "cpu_target": "60"
+  },
+  "verificaciones": [
+    {
+      "verificacion": "variables.tf · instance_type",
+      "esperado": "t3.micro",
+      "obtenido": "t3.micro",
+      "ok": true
+    },
+    {
+      "verificacion": "variables.tf · asg_min",
+      "esperado": 2,
+      "obtenido": "2",
+      "ok": true
+    },
+    {
+      "verificacion": "variables.tf · asg_desired",
+      "esperado": 2,
+      "obtenido": "2",
+      "ok": true
+    },
+    {
+      "verificacion": "variables.tf · asg_max",
+      "esperado": 4,
+      "obtenido": "4",
+      "ok": true
+    },
+    {
+      "verificacion": "variables.tf · cpu_target",
+      "esperado": 60,
+      "obtenido": "60",
+      "ok": true
+    },
+    {
+      "verificacion": "compute.tf · política cpu_target_tracking existe",
+      "esperado": true,
+      "obtenido": true,
+      "ok": true
+    },
+    {
+      "verificacion": "compute.tf · policy_type",
+      "esperado": "TargetTrackingScaling",
+      "obtenido": "TargetTrackingScaling",
+      "ok": true
+    },
+    {
+      "verificacion": "compute.tf · métrica",
+      "esperado": "ASGAverageCPUUtilization",
+      "obtenido": "ASGAverageCPUUtilization",
+      "ok": true
+    },
+    {
+      "verificacion": "compute.tf · target_value",
+      "esperado": "var.cpu_target",
+      "obtenido": "var.cpu_target",
+      "ok": true
+    },
+    {
+      "verificacion": "compute.tf · health_check_type",
+      "esperado": "ELB",
+      "obtenido": "ELB",
+      "ok": true
+    },
+    {
+      "verificacion": "compute.tf · subredes en 2 AZ",
+      "esperado": true,
+      "obtenido": true,
+      "ok": true
+    }
+  ],
+  "escenario": {
+    "capacidad_actual": 2,
+    "cpu_promedio": 78.4,
+    "objetivo": 60.0,
+    "calculo": "ceil(2 × 78.4 / 60.0) = ceil(2.613) = 3",
+    "capacidad_nueva": 3,
+    "decision": "SCALE-OUT de 2 a 3 instancias"
+  },
+  "tabla_decisiones": [
+    {
+      "capacidad_actual": 2,
+      "cpu_promedio": 35.0,
+      "objetivo": 60.0,
+      "calculo": "ceil(2 × 35.0 / 60.0) = ceil(1.167) = 2",
+      "capacidad_nueva": 2,
+      "decision": "Sin cambios (2 instancias)"
+    },
+    {
+      "capacidad_actual": 2,
+      "cpu_promedio": 60.0,
+      "objetivo": 60.0,
+      "calculo": "ceil(2 × 60.0 / 60.0) = ceil(2.000) = 2",
+      "capacidad_nueva": 2,
+      "decision": "Sin cambios (2 instancias)"
+    },
+    {
+      "capacidad_actual": 2,
+      "cpu_promedio": 78.4,
+      "objetivo": 60.0,
+      "calculo": "ceil(2 × 78.4 / 60.0) = ceil(2.613) = 3",
+      "capacidad_nueva": 3,
+      "decision": "SCALE-OUT de 2 a 3 instancias"
+    },
+    {
+      "capacidad_actual": 2,
+      "cpu_promedio": 95.0,
+      "objetivo": 60.0,
+      "calculo": "ceil(2 × 95.0 / 60.0) = ceil(3.167) = 4",
+      "capacidad_nueva": 4,
+      "decision": "SCALE-OUT de 2 a 4 instancias"
+    },
+    {
+      "capacidad_actual": 2,
+      "cpu_promedio": 140.0,
+      "objetivo": 60.0,
+      "calculo": "ceil(2 × 140.0 / 60.0) = ceil(4.667) = 5",
+      "capacidad_nueva": 4,
+      "decision": "SCALE-OUT de 2 a 4 instancias"
+    }
+  ]
+}

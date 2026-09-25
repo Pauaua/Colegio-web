@@ -1,0 +1,97 @@
+{
+  "proyecto": "Gestor Documental — Escuela Básica G-733 Chorombo Bajo",
+  "base_url": "http://localhost:8000",
+  "ejecutado_en": "2026-09-25T14:03:15.791236+00:00",
+  "resumen": {
+    "total": 7,
+    "aprobados": 7,
+    "fallidos": 0,
+    "porcentaje_aprobacion": 100.0
+  },
+  "casos": [
+    {
+      "id": "CP-01",
+      "nombre": "Acceso al sistema",
+      "descripcion": "Selenium abre BASE_URL/ y verifica que carga la pantalla de login (por testID).",
+      "requisito": "RNF",
+      "rol": "Público",
+      "resultado_esperado": "La pantalla de login carga con los campos de usuario, contraseña y botón Ingresar",
+      "resultado_obtenido": "Pantalla de login cargada en http://localhost:8000/ con usuario, contraseña y botón Ingresar",
+      "estado": "PASS",
+      "latencia_ms": 1477.5,
+      "timestamp": "2026-09-25T14:03:07.853274+00:00"
+    },
+    {
+      "id": "CP-02",
+      "nombre": "Comunicación frontend–backend",
+      "descripcion": "Login por la interfaz con directora.chorombo, redirección a /panel con el rol visible, y POST /login devuelve token.",
+      "requisito": "RF2",
+      "rol": "DIRECTOR",
+      "resultado_esperado": "Redirección a /panel mostrando el rol Director(a); POST /login devuelve un token",
+      "resultado_obtenido": "Redirección a /panel con rol visible «Director(a)»; POST /login devolvió token JWT",
+      "estado": "PASS",
+      "latencia_ms": 4504.3,
+      "timestamp": "2026-09-25T14:03:12.357604+00:00"
+    },
+    {
+      "id": "CP-03",
+      "nombre": "Persistencia de metadatos",
+      "descripcion": "POST /documentos con «Acta reunión apoderados 08-2026» (ACTA) y luego GET /documentos.",
+      "requisito": "RF1, RF3",
+      "rol": "DIRECTOR",
+      "resultado_esperado": "201 Created y el título existe en GET /documentos",
+      "resultado_obtenido": "201 Created (id 39, folio ACT-2026-0005); el título aparece en GET /documentos",
+      "estado": "PASS",
+      "latencia_ms": 317.1,
+      "timestamp": "2026-09-25T14:03:12.674705+00:00"
+    },
+    {
+      "id": "CP-04",
+      "nombre": "Health check",
+      "descripcion": "GET /health verifica la base de datos con SELECT 1.",
+      "requisito": "RNF",
+      "rol": "Sistema (ALB)",
+      "resultado_esperado": "200 OK con status: ok",
+      "resultado_obtenido": "200 OK · status=ok · db=ok · instance=Pau",
+      "estado": "PASS",
+      "latencia_ms": 5.6,
+      "timestamp": "2026-09-25T14:03:12.680382+00:00"
+    },
+    {
+      "id": "CP-05",
+      "nombre": "Control de acceso",
+      "descripcion": "Un apoderado no ve un documento solo para directivos y download-url le responde 403.",
+      "requisito": "RF2, RNF",
+      "rol": "APODERADO",
+      "resultado_esperado": "El documento no aparece en su listado y download-url responde 403",
+      "resultado_obtenido": "El documento #18 no aparece en el listado del apoderado y download-url responde 403",
+      "estado": "PASS",
+      "latencia_ms": 286.2,
+      "timestamp": "2026-09-25T14:03:12.966663+00:00"
+    },
+    {
+      "id": "CP-06",
+      "nombre": "Visibilidad del docente",
+      "descripcion": "El docente solo ve documentos visibles para docentes o dirigidos a él.",
+      "requisito": "RF2",
+      "rol": "DOCENTE",
+      "resultado_esperado": "No ve documentos exclusivos de directivos y sí el dirigido a él",
+      "resultado_obtenido": "El docente ve 13 de 21 documentos: solo los visibles para docentes o dirigidos a él",
+      "estado": "PASS",
+      "latencia_ms": 213.1,
+      "timestamp": "2026-09-25T14:03:13.179792+00:00"
+    },
+    {
+      "id": "CP-07",
+      "nombre": "Acuse de recibo",
+      "descripcion": "Un apoderado confirma la lectura de una citación y el directivo lo ve reflejado.",
+      "requisito": "RF2",
+      "rol": "APODERADO / DIRECTOR",
+      "resultado_esperado": "El directivo ve la fecha de confirmación del apoderado",
+      "resultado_obtenido": "Citación #40: el apoderado confirmó y el directivo ve acknowledgedAt=2026-09-25T14:03:13.450Z",
+      "estado": "PASS",
+      "latencia_ms": 394.6,
+      "timestamp": "2026-09-25T14:03:13.574422+00:00"
+    }
+  ]
+}

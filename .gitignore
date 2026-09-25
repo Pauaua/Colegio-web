@@ -25,3 +25,6 @@ tests/*.db
 .venv/
 .artifact/
 .ansible/
+tests/.contingencia.db*
+__pycache__/
+*.pyc

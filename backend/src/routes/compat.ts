@@ -13,7 +13,7 @@ import { badRequest } from '../lib/http-error';
 import { DIRECTIVE_ROLES } from '../lib/permissions';
 import { prisma } from '../lib/prisma';
 import { currentUser, requireAuth, requireRole } from '../middleware/auth';
-import { loginLimiter } from '../middleware/rate-limit';
+import { clearFailedLogins, registerFailedLogin, rejectIfLoginLocked } from '../middleware/rate-limit';
 import { login } from '../services/auth.service';
 import { createDocument, listDocuments, toCompatDocument, type StoredFile } from '../services/documents.service';
 import { decodeBase64, storeFile } from '../services/storage.service';
@@ -32,11 +32,12 @@ const loginSchema = z.object({
   password: z.string().min(1, 'password es obligatorio'),
 });
 
-compatRouter.post('/login', loginLimiter, async (req, res) => {
+compatRouter.post('/login', rejectIfLoginLocked, async (req, res) => {
   const { username, password } = loginSchema.parse(req.body ?? {});
   const result = await login(username, password, { ip: req.ip, userAgent: req.get('user-agent') });
 
   if (result.kind === 'invalid') {
+    await registerFailedLogin(req);
     res.status(401).json({ error: 'INVALID_CREDENTIALS', message: 'Usuario o contraseña incorrectos' });
     return;
   }
@@ -45,6 +46,7 @@ compatRouter.post('/login', loginLimiter, async (req, res) => {
     res.status(401).json({ error: 'MFA_REQUIRED', message: 'El usuario tiene MFA activo; use /api/v1/auth/login', mfaToken: result.mfaToken });
     return;
   }
+  await clearFailedLogins(req);
   res.json({ token: result.session.accessToken, refreshToken: result.session.refreshToken, user: result.user });
 });
 

@@ -1,0 +1,142 @@
+{
+  "proyecto": "Gestor Documental — Escuela Básica G-733 Chorombo Bajo",
+  "base_url": "http://localhost:8000",
+  "ejecutado_en": "2026-09-25T14:23:57.617+00:00",
+  "criterios": {
+    "interrupcion_percibida_max_s": 5,
+    "recuperacion_max_s": 300
+  },
+  "modo": "local",
+  "replicas": 2,
+  "comando": "D:\\Users\\Wasp\\Documents\\Programasound\\proyecto_colegio\\proyecto_chorombo_bajo\\.venv\\Scripts\\python.exe ansible/files/app_referencia.py",
+  "resumen": {
+    "sondeos_totales": 11,
+    "sondeos_fallidos": 1,
+    "interrupcion_percibida_s": 4.3,
+    "tiempo_recuperacion_s": 13.1,
+    "criterio_interrupcion_ok": true,
+    "criterio_recuperacion_ok": true,
+    "primer_fallo": "2026-09-25T14:23:40.193+00:00",
+    "ultimo_fallo": "2026-09-25T14:23:40.193+00:00"
+  },
+  "eventos": [
+    {
+      "timestamp": "2026-09-25T14:23:34.144+00:00",
+      "fase": "Fase 1: HEALTHY",
+      "detalle": "2 réplica(s) en servicio detrás de http://localhost:8000"
+    },
+    {
+      "timestamp": "2026-09-25T14:23:40.192+00:00",
+      "fase": "FALLA INYECTADA",
+      "detalle": "Se detiene abruptamente instancia-us-east-1a-1 (puerto 8001)",
+      "instancia": "instancia-us-east-1a-1"
+    },
+    {
+      "timestamp": "2026-09-25T14:23:43.244+00:00",
+      "fase": "Fase 2: UNHEALTHY",
+      "detalle": "El balanceador retira instancia-us-east-1a-1 tras 2 health checks fallidos",
+      "instancia": "instancia-us-east-1a-1"
+    },
+    {
+      "timestamp": "2026-09-25T14:23:50.194+00:00",
+      "fase": "REEMPLAZO",
+      "detalle": "Se lanza instancia-us-east-1a-1-reemplazo (equivalente a la nueva instancia del ASG)"
+    },
+    {
+      "timestamp": "2026-09-25T14:23:53.320+00:00",
+      "fase": "Fase 3: HEALTHY",
+      "detalle": "instancia-us-east-1a-1-reemplazo pasa 2 health checks y vuelve al balanceo: capacidad restablecida",
+      "instancia": "instancia-us-east-1a-1-reemplazo"
+    }
+  ],
+  "sondeos": [
+    {
+      "timestamp": "2026-09-25T14:23:34.144+00:00",
+      "ok": true,
+      "http": 200,
+      "instance": "instancia-us-east-1b-2",
+      "latencia_ms": 2008.9,
+      "fin": "2026-09-25T14:23:36.153+00:00"
+    },
+    {
+      "timestamp": "2026-09-25T14:23:36.153+00:00",
+      "ok": true,
+      "http": 200,
+      "instance": "instancia-us-east-1a-1",
+      "latencia_ms": 2021.5,
+      "fin": "2026-09-25T14:23:38.175+00:00"
+    },
+    {
+      "timestamp": "2026-09-25T14:23:38.175+00:00",
+      "ok": true,
+      "http": 200,
+      "instance": "instancia-us-east-1b-2",
+      "latencia_ms": 2016.9,
+      "fin": "2026-09-25T14:23:40.192+00:00"
+    },
+    {
+      "timestamp": "2026-09-25T14:23:40.193+00:00",
+      "ok": false,
+      "http": 502,
+      "instance": null,
+      "latencia_ms": 2323.7,
+      "fin": "2026-09-25T14:23:42.517+00:00"
+    },
+    {
+      "timestamp": "2026-09-25T14:23:42.517+00:00",
+      "ok": true,
+      "http": 200,
+      "instance": "instancia-us-east-1b-2",
+      "latencia_ms": 2021.1,
+      "fin": "2026-09-25T14:23:44.539+00:00"
+    },
+    {
+      "timestamp": "2026-09-25T14:23:44.539+00:00",
+      "ok": true,
+      "http": 200,
+      "instance": "instancia-us-east-1b-2",
+      "latencia_ms": 2014.6,
+      "fin": "2026-09-25T14:23:46.553+00:00"
+    },
+    {
+      "timestamp": "2026-09-25T14:23:46.554+00:00",
+      "ok": true,
+      "http": 200,
+      "instance": "instancia-us-east-1b-2",
+      "latencia_ms": 2004.5,
+      "fin": "2026-09-25T14:23:48.558+00:00"
+    },
+    {
+      "timestamp": "2026-09-25T14:23:48.558+00:00",
+      "ok": true,
+      "http": 200,
+      "instance": "instancia-us-east-1b-2",
+      "latencia_ms": 2013.1,
+      "fin": "2026-09-25T14:23:50.572+00:00"
+    },
+    {
+      "timestamp": "2026-09-25T14:23:50.572+00:00",
+      "ok": true,
+      "http": 200,
+      "instance": "instancia-us-east-1b-2",
+      "latencia_ms": 2011.9,
+      "fin": "2026-09-25T14:23:52.584+00:00"
+    },
+    {
+      "timestamp": "2026-09-25T14:23:52.584+00:00",
+      "ok": true,
+      "http": 200,
+      "instance": "instancia-us-east-1b-2",
+      "latencia_ms": 2011.8,
+      "fin": "2026-09-25T14:23:54.596+00:00"
+    },
+    {
+      "timestamp": "2026-09-25T14:23:54.596+00:00",
+      "ok": true,
+      "http": 200,
+      "instance": "instancia-us-east-1a-1-reemplazo",
+      "latencia_ms": 2012.0,
+      "fin": "2026-09-25T14:23:56.608+00:00"
+    }
+  ]
+}
