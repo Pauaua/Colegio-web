@@ -4,19 +4,26 @@
   "private": true,
   "description": "Gestor Documental — Escuela Básica G-733 Chorombo Bajo (María Pinto)",
   "workspaces": [
-    "backend"
+    "backend",
+    "app"
   ],
   "engines": {
     "node": ">=20"
   },
   "scripts": {
-    "dev": "npm run dev -w backend",
+    "dev": "concurrently -k -n api,app -c magenta,cyan \"npm run dev -w backend\" \"npm run start -w app\"",
+    "dev:api": "npm run dev -w backend",
+    "dev:app": "npm run start -w app",
     "db:migrate": "npm run db:migrate -w backend",
     "db:seed": "npm run db:seed -w backend",
     "db:reset": "npm run db:reset -w backend",
-    "typecheck": "npm run typecheck -w backend",
-    "lint": "npm run lint -w backend",
-    "test": "npm test -w backend",
-    "build": "npm run build -w backend"
+    "build:web": "npm run build:web -w app",
+    "build": "npm run build -w backend && npm run build:web",
+    "typecheck": "npm run typecheck -w backend && npm run typecheck -w app",
+    "lint": "npm run lint -w backend && npm run lint -w app",
+    "test": "npm test -w backend"
+  },
+  "devDependencies": {
+    "concurrently": "^10.0.5"
   }
 }

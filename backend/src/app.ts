@@ -4,6 +4,7 @@ import helmet from 'helmet';
 import { pinoHttp } from 'pino-http';
 import { env } from './config/env';
 import { logger } from './lib/logger';
+import { publicStorageOrigins } from './lib/s3';
 import { errorHandler, notFoundHandler } from './middleware/error';
 import { compatRouter } from './routes/compat';
 import { v1Router } from './routes/v1';
@@ -31,8 +32,16 @@ export function createApp(): express.Express {
   app.use(
     helmet({
       crossOriginResourcePolicy: { policy: 'same-site' },
-      // El ALB atiende por HTTP mientras enable_https = false: forzar https en los recursos rompería la app.
-      contentSecurityPolicy: { directives: { upgradeInsecureRequests: null } },
+      contentSecurityPolicy: {
+        directives: {
+          // El ALB atiende por HTTP mientras enable_https = false: forzar https en los recursos rompería la app.
+          upgradeInsecureRequests: null,
+          // La app web sube los archivos directo a S3 (URL firmada) y previsualiza PDF e imágenes desde ahí.
+          connectSrc: ["'self'", ...publicStorageOrigins()],
+          imgSrc: ["'self'", 'data:', 'blob:', ...publicStorageOrigins()],
+          frameSrc: ["'self'", ...publicStorageOrigins()],
+        },
+      },
     }),
   );
   app.use(cors({ origin: corsOrigin() }));

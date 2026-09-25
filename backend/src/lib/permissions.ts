@@ -93,6 +93,19 @@ export function buildDocumentWhere(user: AuthUser): Prisma.DocumentWhereInput {
   return { isDeleted: false, OR: or };
 }
 
+/** Documentos dirigidos explícitamente al usuario: como destinatario o, si es apoderado, al curso de un pupilo. */
+export function buildDirectedToUserWhere(user: AuthUser): Prisma.DocumentWhereInput {
+  const or: Prisma.DocumentWhereInput[] = [{ recipients: { some: { userId: user.id } } }];
+  if (user.role === 'APODERADO') {
+    or.push({
+      courses: {
+        some: { course: { students: { some: { guardians: { some: { guardianId: user.id } } } } } },
+      },
+    });
+  }
+  return { OR: or };
+}
+
 /** Indica si el usuario puede ver un documento concreto, aplicando exactamente las mismas reglas del listado. */
 export async function canViewDocument(user: AuthUser, document: { id: number }): Promise<boolean> {
   const found = await prisma.document.findFirst({

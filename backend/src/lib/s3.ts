@@ -43,11 +43,22 @@ export function presignUpload(key: string, contentType: string): Promise<string>
   });
 }
 
-export function presignDownload(key: string, fileName?: string | null): Promise<string> {
-  const disposition = fileName ? `attachment; filename*=UTF-8''${encodeURIComponent(fileName)}` : undefined;
+/** `attachment` fuerza la descarga; `inline` permite la vista previa en el navegador. */
+export function presignDownload(key: string, fileName?: string | null, mode: 'attachment' | 'inline' = 'attachment'): Promise<string> {
+  const disposition = fileName ? `${mode}; filename*=UTF-8''${encodeURIComponent(fileName)}` : mode;
   return getSignedUrl(
     presignClient,
     new GetObjectCommand({ Bucket: env.S3_BUCKET, Key: key, ResponseContentDisposition: disposition }),
     { expiresIn: DOWNLOAD_URL_TTL_SECONDS },
   );
+}
+
+/**
+ * Origen que usará el navegador para subir y previsualizar archivos (CSP connect-src / frame-src / img-src).
+ * En AWS es el endpoint virtual-hosted del bucket; en local, MinIO.
+ */
+export function publicStorageOrigins(): string[] {
+  const endpoint = env.S3_PUBLIC_ENDPOINT ?? env.S3_ENDPOINT;
+  if (endpoint) return [new URL(endpoint).origin];
+  return [`https://${env.S3_BUCKET}.s3.${env.AWS_REGION}.amazonaws.com`, `https://${env.S3_BUCKET}.s3.amazonaws.com`];
 }

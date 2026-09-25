@@ -1,7 +1,7 @@
 import { Prisma, type DocumentStatus, type Role } from '@prisma/client';
 import { recordAudit } from '../lib/audit';
 import { badRequest, forbidden, notFound } from '../lib/http-error';
-import { buildDocumentWhere, can, canViewDocument, isDirective, type AuthUser } from '../lib/permissions';
+import { buildDirectedToUserWhere, buildDocumentWhere, can, canViewDocument, isDirective, type AuthUser } from '../lib/permissions';
 import { prisma } from '../lib/prisma';
 
 /** Prefijo del folio por tipo de documento (p. ej. ACT-2026-0003). */
@@ -148,6 +148,8 @@ export interface ListDocumentsQuery {
   authorId?: number;
   status?: DocumentStatus;
   q?: string;
+  /** `mine`: solo lo dirigido al usuario (pantalla "Mis documentos"). */
+  scope?: 'all' | 'mine';
   page: number;
   pageSize: number;
   sort: 'documentDate' | 'createdAt' | 'title';
@@ -161,6 +163,7 @@ export async function listDocuments(user: AuthUser, query: ListDocumentsQuery) {
   if (query.from || query.to) filters.push({ documentDate: { gte: query.from, lte: query.to } });
   if (query.authorId) filters.push({ authorId: query.authorId });
   if (query.status) filters.push({ status: query.status });
+  if (query.scope === 'mine') filters.push(buildDirectedToUserWhere(user));
   if (query.q) filters.push({ OR: [{ title: { contains: query.q } }, { folioNumber: { contains: query.q } }] });
 
   const where: Prisma.DocumentWhereInput = { AND: filters };

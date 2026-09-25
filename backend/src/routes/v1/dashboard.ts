@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import type { Prisma } from '@prisma/client';
 import { santiagoYearMonth, startOfSantiagoMonth } from '../../lib/dates';
-import { buildDocumentWhere, can, type AuthUser } from '../../lib/permissions';
+import { buildDirectedToUserWhere, buildDocumentWhere, can, type AuthUser } from '../../lib/permissions';
 import { prisma } from '../../lib/prisma';
 import { currentUser, requireAuth } from '../../middleware/auth';
 import { countPendingAcknowledgements } from '../../services/acknowledgement.service';
@@ -68,10 +68,6 @@ async function globalSummary() {
 
 async function personalSummary(user: AuthUser) {
   const visible = buildDocumentWhere(user);
-  const directedOr: Prisma.DocumentWhereInput[] = [{ recipients: { some: { userId: user.id } } }];
-  if (user.role === 'APODERADO') {
-    directedOr.push({ courses: { some: { course: { students: { some: { guardians: { some: { guardianId: user.id } } } } } } } });
-  }
   const pendingWhere: Prisma.DocumentWhereInput = {
     AND: [
       visible,
@@ -84,7 +80,7 @@ async function personalSummary(user: AuthUser) {
     prisma.document.count({ where: visible }),
     prisma.document.findMany({ where: visible, include: documentInclude, orderBy: { documentDate: 'desc' }, take: 5 }),
     prisma.document.findMany({
-      where: { AND: [visible, { OR: directedOr }] },
+      where: { AND: [visible, buildDirectedToUserWhere(user)] },
       include: documentInclude,
       orderBy: { documentDate: 'desc' },
       take: 10,

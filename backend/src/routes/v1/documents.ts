@@ -38,6 +38,7 @@ const listSchema = z.object({
   authorId: z.coerce.number().int().positive().optional(),
   status: z.enum(DocumentStatus).optional(),
   q: z.string().trim().max(100).optional(),
+  scope: z.enum(['all', 'mine']).default('all'),
   ...pageQuery,
   sort: z.enum(['documentDate', 'createdAt', 'title']).default('documentDate'),
   order: z.enum(['asc', 'desc']).default('desc'),
@@ -209,6 +210,21 @@ documentsRouter.get('/:id/download-url', async (req, res) => {
 
   res.json({
     url: await presignDownload(doc.fileKey, doc.fileName),
+    expiresIn: DOWNLOAD_URL_TTL_SECONDS,
+    fileName: doc.fileName,
+    mimeType: doc.mimeType,
+  });
+});
+
+/** URL para la vista previa (inline). No cuenta como descarga, pero queda en la auditoría. */
+documentsRouter.get('/:id/preview-url', async (req, res) => {
+  const user = currentUser(req);
+  const { id } = idParam.parse(req.params);
+  const doc = await getDocumentForUser(user, id);
+  if (!doc.fileKey) throw notFound('El documento no tiene archivo adjunto');
+  await recordAudit({ userId: user.id, action: 'DOCUMENT_VIEW', entity: 'Document', entityId: id });
+  res.json({
+    url: await presignDownload(doc.fileKey, doc.fileName, 'inline'),
     expiresIn: DOWNLOAD_URL_TTL_SECONDS,
     fileName: doc.fileName,
     mimeType: doc.mimeType,
