@@ -1,8 +1,10 @@
 # Gestor Documental — Escuela Básica G-733 Chorombo Bajo
 
-Plataforma para que el equipo directivo de la **Escuela Básica G-733 Chorombo Bajo** (comuna de María Pinto, 208 estudiantes de prekínder a 8.º básico) **cargue, clasifique, almacene y comparta** sus documentos institucionales: memos, oficios, citaciones, acuerdos de apoderados, actas y permisos administrativos.
+**Aplicación web** para que el equipo directivo de la **Escuela Básica G-733 Chorombo Bajo** (comuna de María Pinto, 208 estudiantes de prekínder a 8.º básico) **cargue, clasifique, almacene y comparta** sus documentos institucionales: memos, oficios, citaciones, acuerdos de apoderados, actas y permisos administrativos.
 
-App **React Native (iOS, Android y Web)** + **API Node.js** + infraestructura **AWS** con **Terraform** y **Ansible**, más pruebas automatizadas funcionales, de carga, de contingencia y de monitoreo.
+Se usa desde cualquier navegador, sin instalar nada, y su diseño se adapta al computador y al celular. Se compone de un frontend web, una **API Node.js** y la infraestructura en **AWS** creada con **Terraform** y **Ansible**. Incluye pruebas automatizadas funcionales, de carga, de contingencia y de monitoreo.
+
+> **También disponible como app para celulares.** El frontend está hecho con React Native (Expo), así que el mismo código genera, además de la versión web, una app para **iOS y Android** con navegación por pestañas. La versión web es la que se despliega en AWS; la app móvil es un complemento que se puede probar con Expo Go (no se publica en las tiendas).
 
 ---
 
@@ -25,7 +27,7 @@ App **React Native (iOS, Android y Web)** + **API Node.js** + infraestructura **
 
 | Componente exigido | Cómo se cubre | Dónde se define |
 |---|---|---|
-| Frontend y backend/API | App Expo (build web) + API Express, ejecutados en EC2 detrás del ALB | `app/`, `backend/`, `compute.tf`, `ansible/` |
+| Frontend y backend/API | Aplicación web (build web de Expo) + API Express, ejecutadas en EC2 detrás del ALB | `app/`, `backend/`, `compute.tf`, `ansible/` |
 | Cómputo | Auto Scaling Group de Amazon EC2 (t3.micro, 2 a 4 instancias) | `compute.tf` |
 | Almacenamiento de archivos | Amazon S3 (privado, SSE-KMS, versionado, ciclo de vida) | `database_storage.tf` |
 | Base de datos | Amazon RDS MySQL Multi-AZ (db.t3.micro) | `database_storage.tf` |
@@ -42,7 +44,7 @@ Diagramas en [`docs/arquitectura.md`](docs/arquitectura.md) y [`docs/autoescalad
 
 ```
 proyecto_chorombo_bajo/
-├── app/                 Expo SDK 57 + React Native + TypeScript (iOS, Android y Web)
+├── app/                 Frontend: aplicación web (Expo SDK 57 + React Native + TypeScript), también como app iOS/Android
 ├── backend/             API REST Express 5 + TypeScript + Prisma (MySQL), tests Jest + Supertest
 ├── terraform/           main, variables, network, compute, database_storage, monitoring, outputs (.tf)
 ├── ansible/             playbook, inventario, generar_inventario.sh, templates/ y files/
@@ -64,7 +66,7 @@ proyecto_chorombo_bajo/
 | Python | 3.9+ | Pruebas y `app_referencia.py` |
 | Apache JMeter | 5.6.x (Java 8+) | Prueba de carga |
 | Google Chrome | reciente | Selenium |
-| Expo Go | en el teléfono | App móvil en desarrollo |
+| Expo Go (opcional) | en el teléfono | Solo para probar la versión app para celulares |
 
 ```bash
 ansible-galaxy collection install amazon.aws community.aws
@@ -87,17 +89,21 @@ cp backend/.env.example backend/.env         # genere un JWT_SECRET propio
 npm run db:migrate
 npm run db:seed
 
-# 5. Levantar
-npm run dev          # API en http://localhost:8000 + Metro (Expo) en paralelo
+# 5. Generar la aplicación web y levantar la API, que la sirve en el puerto 8000
+npm run build:web
+npm run dev:api      # abra http://localhost:8000
 ```
 
 | Qué | Dónde |
 |---|---|
-| App web servida por el backend | `npm run build:web` y luego `http://localhost:8000` |
-| App web en desarrollo (recarga en vivo) | `http://localhost:8081` (Metro; la API se busca en el puerto 8000) |
-| App móvil | Escanee el QR de Metro con **Expo Go** (teléfono y PC en la misma red). La app usa automáticamente la IP del PC. Para que las descargas funcionen en el teléfono, defina `S3_PUBLIC_ENDPOINT=http://<IP-del-PC>:9000` en `backend/.env` |
+| **Aplicación web** (servida por el backend, igual que en AWS) | `http://localhost:8000` |
+| Aplicación web en desarrollo, con recarga en vivo | `npm run dev` (API + Metro) y luego `http://localhost:8081` |
 | Consola de MinIO | `http://localhost:9001` (minioadmin / minioadmin) |
 | Salud de la API | `http://localhost:8000/health` |
+
+La página se adapta sola al tamaño de la pantalla. En el computador muestra una barra lateral, la barra superior con el nombre y el rol, y tablas. Desde el navegador del celular muestra pestañas abajo y tarjetas.
+
+**Opcional: versión app para celulares.** Con `npm run dev` corriendo, escanee el QR de Metro con **Expo Go**. El teléfono y el PC deben estar en la misma red; la app usa automáticamente la IP del PC. Para que las descargas funcionen en el teléfono, defina `S3_PUBLIC_ENDPOINT=http://<IP-del-PC>:9000` en `backend/.env`.
 
 Scripts útiles desde la raíz: `npm run dev:api`, `npm run build:web`, `npm run build:artifact`, `npm test`, `npm run typecheck`, `npm run lint`, `npm run db:reset`.
 
@@ -245,7 +251,7 @@ cd terraform && terraform destroy
 - [x] El equipo directivo puede cargar, clasificar y almacenar los 6 tipos de documentos en S3 (MinIO en local)
 - [x] Cada rol ve solo lo que le corresponde; un apoderado sin acceso recibe 403 al pedir la descarga
 - [x] Los metadatos (tipo, fecha, autor, folio, etc.) quedan en MySQL (RDS en AWS)
-- [x] El dashboard muestra información distinta según el rol, en web y en móvil
+- [x] El dashboard muestra información distinta según el rol, en la web (computador y celular) y en la app móvil
 - [x] Las rutas `/`, `/login`, `/documentos` y `/health` cumplen el contrato del informe en el puerto 8000
 - [x] `terraform validate` sin errores; los 7 archivos `.tf` coinciden con la estructura (`terraform plan` pendiente de credenciales)
 - [x] ASG t3.micro de 2 a 4 instancias, target tracking de CPU al 60%, un NAT por AZ, RDS db.t3.micro Multi-AZ, S3 con SSE-KMS + versionado + ciclo de vida
