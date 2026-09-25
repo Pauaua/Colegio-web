@@ -5,7 +5,8 @@ import { canAccessPath } from "@/lib/permissions";
 
 const { auth } = NextAuth(authConfig);
 
-const PUBLIC_PATHS = ["/login", "/api/health"];
+// /api/storage/local: la firma HMAC de la URL es la autorización (como una URL prefirmada de R2).
+const PUBLIC_PATHS = ["/login", "/api/health", "/api/storage/local"];
 
 function isPublicPath(pathname: string) {
   return pathname.startsWith("/api/auth") || PUBLIC_PATHS.includes(pathname);

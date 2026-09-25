@@ -12,7 +12,6 @@ datasource db {
 
 enum Role {
   DIRECTOR
-  SOSTENEDOR
   EQUIPO_DIRECTIVO
   DOCENTE
   APODERADO
@@ -23,6 +22,13 @@ enum DocumentStatus {
   ARCHIVADO
 }
 
+/// Respuesta del apoderado a una citación.
+enum CitationResponse {
+  ACEPTADA // asistirá
+  RECHAZADA // no podrá asistir
+  REPROGRAMAR // solicita otro horario
+}
+
 enum AuditAction {
   LOGIN
   CREATE_DOCUMENT
@@ -31,6 +37,7 @@ enum AuditAction {
   RESTORE_DOCUMENT
   DELETE_DOCUMENT
   ACKNOWLEDGE_DOCUMENT
+  RESPOND_CITATION
   CREATE_USER
   UPDATE_USER
   CHANGE_ROLE
@@ -93,6 +100,9 @@ model Document {
   fileSize                Int
   status                  DocumentStatus @default(VIGENTE)
   requiresAcknowledgement Boolean        @default(false)
+  // Solo citaciones: cuándo y dónde es la reunión.
+  citationAt              DateTime?
+  citationPlace           String?
   isDeleted               Boolean        @default(false)
   createdAt               DateTime       @default(now())
   updatedAt               DateTime       @updatedAt
@@ -123,12 +133,16 @@ model DocumentVisibility {
   @@index([role])
 }
 
-/// Destinatarios específicos; acknowledgedAt registra el acuse de recibo.
+/// Destinatarios específicos; acknowledgedAt registra el acuse de recibo y,
+/// en las citaciones, response/respondedAt la respuesta del apoderado.
 model DocumentRecipient {
-  documentId     String
-  userId         String
-  acknowledgedAt DateTime?
-  createdAt      DateTime  @default(now())
+  documentId      String
+  userId          String
+  acknowledgedAt  DateTime?
+  response        CitationResponse?
+  responseComment String?
+  respondedAt     DateTime?
+  createdAt       DateTime          @default(now())
 
   document Document @relation(fields: [documentId], references: [id], onDelete: Cascade)
   user     User     @relation(fields: [userId], references: [id], onDelete: Cascade)

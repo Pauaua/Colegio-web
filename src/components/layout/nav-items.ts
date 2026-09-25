@@ -1,5 +1,7 @@
 import {
+  CalendarClock,
   ClipboardList,
+  MailPlus,
   FilePlus2,
   Files,
   Inbox,
@@ -36,6 +38,18 @@ export const NAV_SECTIONS: NavSection[] = [
         label: "Subir documento",
         icon: FilePlus2,
         action: "document:create",
+      },
+      {
+        href: "/citaciones/nueva",
+        label: "Nueva citación",
+        icon: MailPlus,
+        action: "citation:create",
+      },
+      {
+        href: "/citaciones",
+        label: "Citaciones",
+        icon: CalendarClock,
+        action: "citation:viewSent",
       },
       {
         href: "/mis-documentos",

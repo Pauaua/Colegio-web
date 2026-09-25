@@ -3,6 +3,11 @@
  * Server Components, Server Actions, Route Handlers, proxy.ts y la interfaz.
  *
  * Toda consulta de listados de documentos DEBE usar buildDocumentWhere(user).
+ *
+ * Roles:
+ * - DIRECTOR y EQUIPO_DIRECTIVO: gestión completa (documentos, usuarios, cursos, auditoría).
+ * - DOCENTE: genera citaciones a apoderados, ve las que envió y los documentos visibles para docentes.
+ * - APODERADO: solo lectura; responde las citaciones dirigidas a él.
  */
 import type { Prisma } from "@/generated/prisma/client";
 import type { Role } from "@/generated/prisma/enums";
@@ -10,21 +15,24 @@ import type { Role } from "@/generated/prisma/enums";
 export type PermissionUser = { id: string; role: Role };
 
 export type Action =
-  | "document:create"
+  | "document:create" // subir cualquier tipo de documento
   | "document:update" // editar metadatos y visibilidad
   | "document:archive"
   | "document:delete" // borrado lógico
   | "document:viewAll"
-  | "document:viewActivity" // quién descargó / quién confirmó lectura
+  | "document:viewActivity" // quién descargó / leyó / respondió
   | "document:inbox" // "Mis documentos": dirigidos a mí
-  | "document:acknowledge"
+  | "document:acknowledge" // confirmar lectura
+  | "citation:create" // generar una citación a apoderados
+  | "citation:viewSent" // "Citaciones": las enviadas (todas para directivos, propias para docentes)
+  | "citation:respond" // aceptar / rechazar / pedir otro horario
   | "user:manage"
   | "course:manage"
   | "audit:view"
   | "dashboard:viewStats"; // estadísticas institucionales
 
-const MANAGEMENT: readonly Role[] = ["DIRECTOR", "SOSTENEDOR", "EQUIPO_DIRECTIVO"];
-const TOP: readonly Role[] = ["DIRECTOR", "SOSTENEDOR"];
+const MANAGEMENT: readonly Role[] = ["DIRECTOR", "EQUIPO_DIRECTIVO"];
+const STAFF: readonly Role[] = ["DIRECTOR", "EQUIPO_DIRECTIVO", "DOCENTE"];
 const COMMUNITY: readonly Role[] = ["DOCENTE", "APODERADO"];
 
 /** Roles con permiso para cada acción (sin considerar el recurso). */
@@ -32,25 +40,25 @@ const ROLE_PERMISSIONS: Record<Action, readonly Role[]> = {
   "document:create": MANAGEMENT,
   "document:update": MANAGEMENT,
   "document:archive": MANAGEMENT,
-  "document:delete": TOP,
+  "document:delete": MANAGEMENT,
   "document:viewAll": MANAGEMENT,
-  "document:viewActivity": MANAGEMENT,
+  // Los docentes solo sobre sus propias citaciones (ver can()).
+  "document:viewActivity": STAFF,
   "document:inbox": COMMUNITY,
   "document:acknowledge": COMMUNITY,
-  "user:manage": TOP,
-  "course:manage": TOP,
+  "citation:create": STAFF,
+  "citation:viewSent": STAFF,
+  "citation:respond": ["APODERADO"],
+  "user:manage": MANAGEMENT,
+  "course:manage": MANAGEMENT,
   "audit:view": MANAGEMENT,
   "dashboard:viewStats": MANAGEMENT,
-};
-
-/** Acciones que el equipo directivo solo puede hacer sobre documentos propios. */
-const OWN_DOCUMENTS_ONLY: Partial<Record<Role, readonly Action[]>> = {
-  EQUIPO_DIRECTIVO: ["document:update", "document:archive"],
 };
 
 export type DocumentForPermission = {
   authorId: string;
   isDeleted: boolean;
+  isCitation: boolean;
   visibility: readonly Role[];
   recipientIds: readonly string[];
 };
@@ -72,25 +80,27 @@ export function isManagement(role: Role): boolean {
 export function can(user: PermissionUser, action: Action, resource?: DocumentForPermission): boolean {
   if (!roleCan(user.role, action)) return false;
   if (!resource) return true;
-
   if (resource.isDeleted) return false;
 
-  if (OWN_DOCUMENTS_ONLY[user.role]?.includes(action)) {
-    return resource.authorId === user.id;
+  switch (action) {
+    case "document:viewActivity":
+      return isManagement(user.role) || resource.authorId === user.id;
+    case "document:acknowledge":
+      return resource.recipientIds.includes(user.id);
+    case "citation:respond":
+      return resource.isCitation && resource.recipientIds.includes(user.id);
+    default:
+      return true;
   }
-
-  if (action === "document:acknowledge") {
-    return resource.recipientIds.includes(user.id);
-  }
-
-  return true;
 }
 
 /** Visibilidad de un documento: misma regla que buildDocumentWhere, evaluada en memoria. */
 export function canViewDocument(user: PermissionUser, doc: DocumentForPermission): boolean {
   if (doc.isDeleted) return false;
   if (isManagement(user.role)) return true;
-  return doc.visibility.includes(user.role) || doc.recipientIds.includes(user.id);
+  return (
+    doc.visibility.includes(user.role) || doc.recipientIds.includes(user.id) || doc.authorId === user.id
+  );
 }
 
 /** La descarga exige exactamente lo mismo que la visualización. */
@@ -98,8 +108,8 @@ export const canDownloadDocument = canViewDocument;
 
 /**
  * Filtro de Prisma con los documentos que `user` puede ver.
- * Directivos: todos los no eliminados. Docentes y apoderados: los visibles
- * para su rol o dirigidos a ellos (también los archivados, como registro histórico).
+ * Directivos: todos los no eliminados. Docentes y apoderados: los visibles para su
+ * rol, los dirigidos a ellos y los que crearon (también archivados, como registro histórico).
  */
 export function buildDocumentWhere(user: PermissionUser): Prisma.DocumentWhereInput {
   if (isManagement(user.role)) {
@@ -107,7 +117,11 @@ export function buildDocumentWhere(user: PermissionUser): Prisma.DocumentWhereIn
   }
   return {
     isDeleted: false,
-    OR: [{ visibility: { some: { role: user.role } } }, { recipients: { some: { userId: user.id } } }],
+    OR: [
+      { visibility: { some: { role: user.role } } },
+      { recipients: { some: { userId: user.id } } },
+      { authorId: user.id },
+    ],
   };
 }
 
@@ -117,6 +131,8 @@ export function buildDocumentWhere(user: PermissionUser): Prisma.DocumentWhereIn
 const ROUTE_RULES: { pattern: RegExp; action: Action }[] = [
   { pattern: /^\/documentos\/nuevo\/?$/, action: "document:create" },
   { pattern: /^\/documentos\/[^/]+\/editar\/?$/, action: "document:update" },
+  { pattern: /^\/citaciones\/nueva\/?$/, action: "citation:create" },
+  { pattern: /^\/citaciones(\/|$)/, action: "citation:viewSent" },
   { pattern: /^\/mis-documentos(\/|$)/, action: "document:inbox" },
   { pattern: /^\/usuarios(\/|$)/, action: "user:manage" },
   { pattern: /^\/cursos(\/|$)/, action: "course:manage" },

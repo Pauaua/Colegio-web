@@ -18,7 +18,6 @@ import {
 
 const users = {
   director: { id: "u-director", role: "DIRECTOR" },
-  sostenedor: { id: "u-sostenedor", role: "SOSTENEDOR" },
   directivo: { id: "u-directivo", role: "EQUIPO_DIRECTIVO" },
   docente: { id: "u-docente", role: "DOCENTE" },
   apoderado: { id: "u-apoderado", role: "APODERADO" },
@@ -30,6 +29,7 @@ const USER_KEYS = Object.keys(users) as UserKey[];
 const doc = (overrides: Partial<DocumentForPermission> = {}): DocumentForPermission => ({
   authorId: users.director.id,
   isDeleted: false,
+  isCitation: false,
   visibility: [],
   recipientIds: [],
   ...overrides,
@@ -44,6 +44,7 @@ const documents = {
   dirigidoAlDocente: doc({ recipientIds: [users.docente.id] }),
   dirigidoAlApoderado: doc({ recipientIds: [users.apoderado.id] }),
   dirigidoAOtroApoderado: doc({ recipientIds: ["u-otro-apoderado"] }),
+  creadoPorElDocente: doc({ authorId: users.docente.id }),
   eliminado: doc({
     isDeleted: true,
     visibility: ["DOCENTE", "APODERADO"],
@@ -64,16 +65,7 @@ const EXPECTED_VISIBILITY: Record<UserKey, Record<DocKey, boolean>> = {
     dirigidoAlDocente: true,
     dirigidoAlApoderado: true,
     dirigidoAOtroApoderado: true,
-    eliminado: false,
-  },
-  sostenedor: {
-    soloDirectivos: true,
-    visibleDocentes: true,
-    visibleApoderados: true,
-    visibleComunidad: true,
-    dirigidoAlDocente: true,
-    dirigidoAlApoderado: true,
-    dirigidoAOtroApoderado: true,
+    creadoPorElDocente: true,
     eliminado: false,
   },
   directivo: {
@@ -84,6 +76,7 @@ const EXPECTED_VISIBILITY: Record<UserKey, Record<DocKey, boolean>> = {
     dirigidoAlDocente: true,
     dirigidoAlApoderado: true,
     dirigidoAOtroApoderado: true,
+    creadoPorElDocente: true,
     eliminado: false,
   },
   docente: {
@@ -94,6 +87,7 @@ const EXPECTED_VISIBILITY: Record<UserKey, Record<DocKey, boolean>> = {
     dirigidoAlDocente: true,
     dirigidoAlApoderado: false,
     dirigidoAOtroApoderado: false,
+    creadoPorElDocente: true,
     eliminado: false,
   },
   apoderado: {
@@ -104,6 +98,7 @@ const EXPECTED_VISIBILITY: Record<UserKey, Record<DocKey, boolean>> = {
     dirigidoAlDocente: false,
     dirigidoAlApoderado: true,
     dirigidoAOtroApoderado: false,
+    creadoPorElDocente: false,
     eliminado: false,
   },
 };
@@ -125,6 +120,7 @@ function matchesWhere(where: Prisma.DocumentWhereInput, d: DocumentForPermission
       if (role) return d.visibility.includes(role as Role);
       const userId = clause.recipients?.some?.userId;
       if (userId) return d.recipientIds.includes(userId as string);
+      if (typeof clause.authorId === "string") return d.authorId === clause.authorId;
       throw new Error(`Cláusula OR no soportada: ${JSON.stringify(clause)}`);
     });
   }
@@ -164,15 +160,19 @@ describe("canDownloadDocument", () => {
 
 describe("buildDocumentWhere", () => {
   it("los directivos ven todos los documentos no eliminados", () => {
-    for (const key of ["director", "sostenedor", "directivo"] as const) {
+    for (const key of ["director", "directivo"] as const) {
       expect(buildDocumentWhere(users[key])).toEqual({ isDeleted: false });
     }
   });
 
-  it("docente: visibles para su rol o dirigidos a él, nunca eliminados", () => {
+  it("docente: visibles para su rol, dirigidos a él o creados por él, nunca eliminados", () => {
     expect(buildDocumentWhere(users.docente)).toEqual({
       isDeleted: false,
-      OR: [{ visibility: { some: { role: "DOCENTE" } } }, { recipients: { some: { userId: "u-docente" } } }],
+      OR: [
+        { visibility: { some: { role: "DOCENTE" } } },
+        { recipients: { some: { userId: "u-docente" } } },
+        { authorId: "u-docente" },
+      ],
     });
   });
 
@@ -198,18 +198,21 @@ describe("buildDocumentWhere", () => {
 // ─── Acciones por rol (tabla de la especificación) ──────────────────────
 
 const EXPECTED_ACTIONS: Record<Action, UserKey[]> = {
-  "document:create": ["director", "sostenedor", "directivo"],
-  "document:update": ["director", "sostenedor", "directivo"],
-  "document:archive": ["director", "sostenedor", "directivo"],
-  "document:delete": ["director", "sostenedor"],
-  "document:viewAll": ["director", "sostenedor", "directivo"],
-  "document:viewActivity": ["director", "sostenedor", "directivo"],
+  "document:create": ["director", "directivo"],
+  "document:update": ["director", "directivo"],
+  "document:archive": ["director", "directivo"],
+  "document:delete": ["director", "directivo"],
+  "document:viewAll": ["director", "directivo"],
+  "document:viewActivity": ["director", "directivo", "docente"],
   "document:inbox": ["docente", "apoderado"],
   "document:acknowledge": ["docente", "apoderado"],
-  "user:manage": ["director", "sostenedor"],
-  "course:manage": ["director", "sostenedor"],
-  "audit:view": ["director", "sostenedor", "directivo"],
-  "dashboard:viewStats": ["director", "sostenedor", "directivo"],
+  "citation:create": ["director", "directivo", "docente"],
+  "citation:viewSent": ["director", "directivo", "docente"],
+  "citation:respond": ["apoderado"],
+  "user:manage": ["director", "directivo"],
+  "course:manage": ["director", "directivo"],
+  "audit:view": ["director", "directivo"],
+  "dashboard:viewStats": ["director", "directivo"],
 };
 
 describe("can(): permisos de rol sin recurso", () => {
@@ -227,24 +230,33 @@ describe("can(): reglas sobre un documento concreto", () => {
   const ownDoc = doc({ authorId: users.directivo.id });
   const othersDoc = doc({ authorId: users.director.id });
 
-  it("equipo directivo edita y archiva solo sus propios documentos", () => {
-    expect(can(users.directivo, "document:update", ownDoc)).toBe(true);
-    expect(can(users.directivo, "document:archive", ownDoc)).toBe(true);
-    expect(can(users.directivo, "document:update", othersDoc)).toBe(false);
-    expect(can(users.directivo, "document:archive", othersDoc)).toBe(false);
-  });
-
-  it("director y sostenedor editan y archivan documentos de cualquier autor", () => {
-    for (const key of ["director", "sostenedor"] as const) {
-      expect(can(users[key], "document:update", ownDoc)).toBe(true);
-      expect(can(users[key], "document:archive", ownDoc)).toBe(true);
+  it("director y equipo directivo editan, archivan y eliminan documentos de cualquier autor", () => {
+    for (const key of ["director", "directivo"] as const) {
+      for (const action of ["document:update", "document:archive", "document:delete"] as const) {
+        expect(can(users[key], action, ownDoc), `${key} ${action} propio`).toBe(true);
+        expect(can(users[key], action, othersDoc), `${key} ${action} ajeno`).toBe(true);
+      }
     }
   });
 
-  it("solo director y sostenedor eliminan, incluso si el directivo es el autor", () => {
-    expect(can(users.director, "document:delete", ownDoc)).toBe(true);
-    expect(can(users.sostenedor, "document:delete", ownDoc)).toBe(true);
-    expect(can(users.directivo, "document:delete", ownDoc)).toBe(false);
+  it("el docente ve la actividad solo de las citaciones que él creó", () => {
+    const ownCitation = doc({ authorId: users.docente.id, isCitation: true });
+    const othersCitation = doc({ authorId: users.director.id, isCitation: true });
+    expect(can(users.docente, "document:viewActivity", ownCitation)).toBe(true);
+    expect(can(users.docente, "document:viewActivity", othersCitation)).toBe(false);
+    expect(can(users.directivo, "document:viewActivity", othersCitation)).toBe(true);
+  });
+
+  it("solo el apoderado destinatario responde, y solo si es una citación", () => {
+    const citation = doc({ isCitation: true, recipientIds: [users.apoderado.id] });
+    expect(can(users.apoderado, "citation:respond", citation)).toBe(true);
+    expect(can(users.apoderado, "citation:respond", documents.dirigidoAlApoderado)).toBe(false);
+    expect(
+      can(users.apoderado, "citation:respond", doc({ isCitation: true, recipientIds: ["u-otro-apoderado"] })),
+    ).toBe(false);
+    expect(
+      can(users.docente, "citation:respond", doc({ isCitation: true, recipientIds: [users.docente.id] })),
+    ).toBe(false);
   });
 
   it("nadie edita, archiva ni elimina un documento ya eliminado", () => {
@@ -278,13 +290,15 @@ const ROUTES: Record<string, UserKey[]> = {
   "/documentos": USER_KEYS,
   "/documentos/abc123": USER_KEYS,
   "/perfil": USER_KEYS,
-  "/documentos/nuevo": ["director", "sostenedor", "directivo"],
-  "/documentos/abc123/editar": ["director", "sostenedor", "directivo"],
+  "/documentos/nuevo": ["director", "directivo"],
+  "/documentos/abc123/editar": ["director", "directivo"],
+  "/citaciones": ["director", "directivo", "docente"],
+  "/citaciones/nueva": ["director", "directivo", "docente"],
   "/mis-documentos": ["docente", "apoderado"],
-  "/usuarios": ["director", "sostenedor"],
-  "/usuarios/xyz": ["director", "sostenedor"],
-  "/cursos": ["director", "sostenedor"],
-  "/auditoria": ["director", "sostenedor", "directivo"],
+  "/usuarios": ["director", "directivo"],
+  "/usuarios/xyz": ["director", "directivo"],
+  "/cursos": ["director", "directivo"],
+  "/auditoria": ["director", "directivo"],
 };
 
 describe("canAccessPath", () => {

@@ -1,5 +1,5 @@
 /**
- * Generador mínimo de PDFs de una página (sin dependencias) para los archivos de muestra.
+ * Generador mínimo de PDFs de una página (sin dependencias): citaciones generadas y archivos del seed.
  * Usa Helvetica con WinAnsiEncoding, suficiente para el español.
  */
 
@@ -43,7 +43,7 @@ function wrap(text: string, maxChars: number): string[] {
   return lines;
 }
 
-export function buildSamplePdf(opts: {
+export function buildSimplePdf(opts: {
   heading: string;
   title: string;
   meta: string[];

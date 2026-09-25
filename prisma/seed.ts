@@ -5,16 +5,16 @@
 import "dotenv/config";
 
 import { randomUUID } from "node:crypto";
-import { mkdir, writeFile } from "node:fs/promises";
-import path from "node:path";
 
 import { PrismaPg } from "@prisma/adapter-pg";
 import bcrypt from "bcryptjs";
 
 import { PrismaClient, type Role } from "../src/generated/prisma/client";
+import { slugify } from "../src/lib/files";
 import { computeRutVerifier } from "../src/lib/rut";
+import { deleteFile, getStorageDriverName, putFile } from "../src/lib/storage";
 
-import { buildSamplePdf } from "./seed-pdf";
+import { buildSimplePdf } from "../src/lib/pdf";
 
 const prisma = new PrismaClient({
   adapter: new PrismaPg({ connectionString: process.env.DIRECT_URL ?? process.env.DATABASE_URL! }),
@@ -22,19 +22,8 @@ const prisma = new PrismaClient({
 
 export const SEED_PASSWORD = "Colegio2026!";
 const YEAR = 2026;
-const SEED_FILES_DIR = path.join(__dirname, "seed-files");
 
 const rut = (body: number) => `${body}-${computeRutVerifier(String(body))}`;
-
-function slugify(value: string) {
-  return value
-    .normalize("NFD")
-    .replace(/[̀-ͯ]/g, "")
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/^-+|-+$/g, "")
-    .slice(0, 60);
-}
 
 /** Fecha de calendario a medianoche UTC (columna @db.Date). */
 const day = (month: number, date: number) => new Date(Date.UTC(YEAR, month - 1, date));
@@ -59,13 +48,6 @@ const USERS = [
     email: "director@colegio.cl",
     role: "DIRECTOR",
     rutBody: 12345678,
-  },
-  {
-    key: "sostenedor",
-    fullName: "Jorge Valenzuela Rojas",
-    email: "sostenedor@colegio.cl",
-    role: "SOSTENEDOR",
-    rutBody: 9876543,
   },
   {
     key: "directivo",
@@ -134,7 +116,7 @@ const DOCUMENTS: SeedDocument[] = [
     title: "Oficio a la Superintendencia de Educación",
     type: "OFICIO",
     date: [4, 3],
-    author: "sostenedor",
+    author: "director",
     description: "Respuesta a solicitud de antecedentes de matrícula.",
   },
   {
@@ -182,7 +164,7 @@ const DOCUMENTS: SeedDocument[] = [
     title: "Oficio al DAEM sobre mantención de infraestructura",
     type: "OFICIO",
     date: [6, 2],
-    author: "sostenedor",
+    author: "director",
     description: "Solicitud de reparación de techumbre del gimnasio.",
   },
   {
@@ -231,7 +213,7 @@ const DOCUMENTS: SeedDocument[] = [
     title: "Acuerdo de convivencia con el Centro de Padres",
     type: "ACUERDO",
     date: [8, 4],
-    author: "sostenedor",
+    author: "director",
     visibleTo: ["APODERADO"],
     description: "Compromisos de colaboración para actividades del año.",
   },
@@ -289,6 +271,10 @@ const DOCUMENTS: SeedDocument[] = [
 ];
 
 async function resetDatabase() {
+  // Archivos de un seed anterior: se borran del storage para no dejar huérfanos.
+  const previousFiles = await prisma.document.findMany({ select: { fileKey: true } });
+  await Promise.all(previousFiles.map((d) => deleteFile(d.fileKey).catch(() => undefined)));
+
   // Orden inverso a las dependencias.
   await prisma.downloadLog.deleteMany();
   await prisma.auditLog.deleteMany();
@@ -373,8 +359,7 @@ async function main() {
   >;
   const courseIds = { "3B": course3B.id, "1M": course1M.id };
 
-  console.log("📄 Documentos y archivos de muestra…");
-  await mkdir(SEED_FILES_DIR, { recursive: true });
+  console.log(`📄 Documentos y archivos de muestra (storage: ${getStorageDriverName()})…`);
   const folioCounters = new Map<TypeCode, number>();
   const createdDocs: { id: string; recipients: UserKey[]; visibleTo: Role[] }[] = [];
 
@@ -385,7 +370,7 @@ async function main() {
     const [month, date] = doc.date;
     const slug = slugify(doc.title);
     const fileKey = `documents/${YEAR}/${randomUUID()}-${slug}.pdf`;
-    const pdf = buildSamplePdf({
+    const pdf = buildSimplePdf({
       heading: "Establecimiento Educacional — Documento de muestra",
       title: doc.title,
       meta: [
@@ -395,8 +380,7 @@ async function main() {
       ],
       body: `${doc.description} Este archivo fue generado automáticamente por el seed de desarrollo del Gestor Documental Escolar.`,
     });
-    // Copia local; en la fase 3 el seed también lo sube al storage (R2) con esta misma clave.
-    await writeFile(path.join(SEED_FILES_DIR, `${slug}.pdf`), pdf);
+    await putFile(fileKey, pdf, "application/pdf");
 
     const recipients: UserKey[] = [
       ...(doc.recipients ?? []),
@@ -454,7 +438,7 @@ async function main() {
     { docIndex: 19, user: "docente", month: 9, date: 9 },
     { docIndex: 19, user: "apoderado", month: 9, date: 10 },
     { docIndex: 19, user: "apoderado2", month: 9, date: 11 },
-    { docIndex: 2, user: "sostenedor", month: 9, date: 12 },
+    { docIndex: 2, user: "director", month: 9, date: 12 },
   ];
   await prisma.downloadLog.createMany({
     data: downloads.map((d) => ({
