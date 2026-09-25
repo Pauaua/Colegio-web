@@ -1,0 +1,22 @@
+{
+  "name": "proyecto_chorombo_bajo",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Gestor Documental — Escuela Básica G-733 Chorombo Bajo (María Pinto)",
+  "workspaces": [
+    "backend"
+  ],
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "dev": "npm run dev -w backend",
+    "db:migrate": "npm run db:migrate -w backend",
+    "db:seed": "npm run db:seed -w backend",
+    "db:reset": "npm run db:reset -w backend",
+    "typecheck": "npm run typecheck -w backend",
+    "lint": "npm run lint -w backend",
+    "test": "npm test -w backend",
+    "build": "npm run build -w backend"
+  }
+}

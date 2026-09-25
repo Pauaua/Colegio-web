@@ -1,0 +1,25 @@
+node_modules/
+dist/
+build/
+coverage/
+*.log
+.env
+.env.*
+!.env.example
+.npmrc
+.expo/
+app/dist/
+web-build/
+# Terraform
+terraform/.terraform/
+terraform/*.tfstate
+terraform/*.tfstate.*
+terraform/terraform.tfvars
+terraform/.terraform.lock.hcl.bak
+# Artefactos y herramientas locales
+ansible/files/gestor-documental.tar.gz
+tools/
+tests/__pycache__/
+tests/.pytest_cache/
+tests/*.db
+.venv/

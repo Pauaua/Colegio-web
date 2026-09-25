@@ -1,0 +1,213 @@
+// Modelo de datos del Gestor Documental — Escuela Básica G-733 Chorombo Bajo.
+// Base relacional: Amazon RDS MySQL 8 (MySQL 8 en Docker para desarrollo local).
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  DIRECTOR
+  SOSTENEDOR
+  EQUIPO_DIRECTIVO
+  DOCENTE
+  APODERADO
+}
+
+enum DocumentStatus {
+  VIGENTE
+  ARCHIVADO
+}
+
+model User {
+  id           Int      @id @default(autoincrement())
+  username     String   @unique @db.VarChar(60)
+  fullName     String   @db.VarChar(120)
+  rut          String   @unique @db.VarChar(12)
+  email        String   @unique @db.VarChar(160)
+  passwordHash String   @db.VarChar(100)
+  role         Role
+  phone        String?  @db.VarChar(20)
+  isActive     Boolean  @default(true)
+  mfaEnabled   Boolean  @default(false)
+  /// Secreto TOTP cifrado con AES-256-GCM (ver src/lib/crypto.ts)
+  mfaSecret    String?  @db.VarChar(255)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  documents     Document[]          @relation("DocumentAuthor")
+  recipientOf   DocumentRecipient[]
+  guardianOf    GuardianStudent[]
+  downloads     DownloadLog[]
+  auditLogs     AuditLog[]
+  refreshTokens RefreshToken[]
+
+  @@index([role])
+  @@map("users")
+}
+
+model DocumentType {
+  id        Int        @id @default(autoincrement())
+  code      String     @unique @db.VarChar(40)
+  name      String     @db.VarChar(80)
+  color     String     @db.VarChar(9)
+  documents Document[]
+
+  @@map("document_types")
+}
+
+model Document {
+  id                      Int            @id @default(autoincrement())
+  title                   String         @db.VarChar(200)
+  description             String?        @db.Text
+  documentTypeId          Int
+  /// Folio legible (p. ej. ACT-2026-0003), único por tipo y año
+  folioNumber             String         @db.VarChar(30)
+  folioYear               Int
+  documentDate            DateTime       @db.Date
+  authorId                Int
+  fileKey                 String?        @db.VarChar(512)
+  fileName                String?        @db.VarChar(255)
+  mimeType                String?        @db.VarChar(120)
+  fileSize                Int?
+  status                  DocumentStatus @default(VIGENTE)
+  requiresAcknowledgement Boolean        @default(false)
+  isDeleted               Boolean        @default(false)
+  createdAt               DateTime       @default(now())
+  updatedAt               DateTime       @updatedAt
+
+  documentType DocumentType         @relation(fields: [documentTypeId], references: [id])
+  author       User                 @relation("DocumentAuthor", fields: [authorId], references: [id])
+  visibilities DocumentVisibility[]
+  recipients   DocumentRecipient[]
+  courses      DocumentCourse[]
+  downloads    DownloadLog[]
+
+  @@unique([documentTypeId, folioYear, folioNumber])
+  @@index([documentTypeId])
+  @@index([documentDate])
+  @@index([authorId])
+  @@index([status])
+  @@index([createdAt])
+  @@map("documents")
+}
+
+/// Roles (además de los directivos) que pueden ver el documento
+model DocumentVisibility {
+  documentId Int
+  role       Role
+  document   Document @relation(fields: [documentId], references: [id], onDelete: Cascade)
+
+  @@id([documentId, role])
+  @@map("document_visibilities")
+}
+
+/// Destinatarios específicos y registro del acuse de recibo
+model DocumentRecipient {
+  documentId     Int
+  userId         Int
+  acknowledgedAt DateTime?
+  document       Document  @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  user           User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([documentId, userId])
+  @@index([userId])
+  @@map("document_recipients")
+}
+
+/// Dirige el documento a todos los apoderados de un curso
+model DocumentCourse {
+  documentId Int
+  courseId   Int
+  document   Document @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  course     Course   @relation(fields: [courseId], references: [id], onDelete: Cascade)
+
+  @@id([documentId, courseId])
+  @@index([courseId])
+  @@map("document_courses")
+}
+
+model Course {
+  id        Int              @id @default(autoincrement())
+  name      String           @db.VarChar(60)
+  year      Int
+  students  Student[]
+  documents DocumentCourse[]
+
+  @@unique([name, year])
+  @@map("courses")
+}
+
+model Student {
+  id        Int               @id @default(autoincrement())
+  fullName  String            @db.VarChar(120)
+  rut       String            @unique @db.VarChar(12)
+  courseId  Int
+  course    Course            @relation(fields: [courseId], references: [id])
+  guardians GuardianStudent[]
+
+  @@index([courseId])
+  @@map("students")
+}
+
+model GuardianStudent {
+  guardianId Int
+  studentId  Int
+  guardian   User    @relation(fields: [guardianId], references: [id], onDelete: Cascade)
+  student    Student @relation(fields: [studentId], references: [id], onDelete: Cascade)
+
+  @@id([guardianId, studentId])
+  @@index([studentId])
+  @@map("guardian_students")
+}
+
+model DownloadLog {
+  id           Int      @id @default(autoincrement())
+  documentId   Int
+  userId       Int
+  downloadedAt DateTime @default(now())
+  ipAddress    String?  @db.VarChar(64)
+  userAgent    String?  @db.VarChar(255)
+  document     Document @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([documentId])
+  @@index([userId])
+  @@index([downloadedAt])
+  @@map("download_logs")
+}
+
+model AuditLog {
+  id        Int      @id @default(autoincrement())
+  /// Nulo en eventos sin usuario identificado (p. ej. login fallido)
+  userId    Int?
+  action    String   @db.VarChar(60)
+  entity    String   @db.VarChar(60)
+  entityId  String?  @db.VarChar(60)
+  metadata  Json?
+  createdAt DateTime @default(now())
+  user      User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([userId])
+  @@index([action])
+  @@index([createdAt])
+  @@map("audit_logs")
+}
+
+model RefreshToken {
+  id        Int       @id @default(autoincrement())
+  userId    Int
+  /// SHA-256 del token; el token en claro nunca se guarda
+  tokenHash String    @unique @db.VarChar(64)
+  expiresAt DateTime
+  revokedAt DateTime?
+  createdAt DateTime  @default(now())
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("refresh_tokens")
+}
