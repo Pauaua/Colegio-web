@@ -1,0 +1,226 @@
+// Gestor Documental Escolar — modelo de datos
+// Docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum Role {
+  DIRECTOR
+  SOSTENEDOR
+  EQUIPO_DIRECTIVO
+  DOCENTE
+  APODERADO
+}
+
+enum DocumentStatus {
+  VIGENTE
+  ARCHIVADO
+}
+
+enum AuditAction {
+  LOGIN
+  CREATE_DOCUMENT
+  UPDATE_DOCUMENT
+  ARCHIVE_DOCUMENT
+  RESTORE_DOCUMENT
+  DELETE_DOCUMENT
+  ACKNOWLEDGE_DOCUMENT
+  CREATE_USER
+  UPDATE_USER
+  CHANGE_ROLE
+  DEACTIVATE_USER
+  ACTIVATE_USER
+  CHANGE_PASSWORD
+  CREATE_COURSE
+  UPDATE_COURSE
+  DELETE_COURSE
+  CREATE_STUDENT
+  UPDATE_STUDENT
+  DELETE_STUDENT
+  LINK_GUARDIAN
+  UNLINK_GUARDIAN
+}
+
+model User {
+  id           String   @id @default(cuid())
+  fullName     String
+  rut          String   @unique // normalizado: "12345678-9"
+  email        String   @unique // siempre en minúsculas
+  passwordHash String
+  role         Role
+  phone        String?
+  isActive     Boolean  @default(true)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  authoredDocuments Document[]
+  recipientOf       DocumentRecipient[]
+  students          GuardianStudent[]
+  downloads         DownloadLog[]
+  auditLogs         AuditLog[]
+
+  @@index([role])
+}
+
+model DocumentType {
+  id    String @id @default(cuid())
+  code  String @unique // MEMO, OFICIO, CITACION, ACUERDO, ACTA, PERMISO
+  name  String
+  color String // color pastel de la etiqueta (hex)
+
+  documents Document[]
+}
+
+model Document {
+  id                      String         @id @default(cuid())
+  title                   String
+  description             String?
+  documentTypeId          String
+  folioNumber             Int
+  // Año del folio (derivado de documentDate): el folio es único por tipo y año.
+  folioYear               Int
+  documentDate            DateTime       @db.Date
+  authorId                String
+  fileKey                 String         @unique
+  fileName                String
+  mimeType                String
+  fileSize                Int
+  status                  DocumentStatus @default(VIGENTE)
+  requiresAcknowledgement Boolean        @default(false)
+  isDeleted               Boolean        @default(false)
+  createdAt               DateTime       @default(now())
+  updatedAt               DateTime       @updatedAt
+
+  documentType DocumentType         @relation(fields: [documentTypeId], references: [id])
+  author       User                 @relation(fields: [authorId], references: [id])
+  visibility   DocumentVisibility[]
+  recipients   DocumentRecipient[]
+  courses      DocumentCourse[]
+  downloads    DownloadLog[]
+
+  @@unique([documentTypeId, folioYear, folioNumber])
+  @@index([documentTypeId])
+  @@index([documentDate])
+  @@index([authorId])
+  @@index([status])
+  @@index([createdAt])
+}
+
+/// Roles que pueden ver el documento (además de los directivos, que ven todo).
+model DocumentVisibility {
+  documentId String
+  role       Role
+
+  document Document @relation(fields: [documentId], references: [id], onDelete: Cascade)
+
+  @@id([documentId, role])
+  @@index([role])
+}
+
+/// Destinatarios específicos; acknowledgedAt registra el acuse de recibo.
+model DocumentRecipient {
+  documentId     String
+  userId         String
+  acknowledgedAt DateTime?
+  createdAt      DateTime  @default(now())
+
+  document Document @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  user     User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([documentId, userId])
+  @@index([userId])
+}
+
+/// Cursos a los que se dirigió el documento. Al subirlo, sus apoderados
+/// se agregan como DocumentRecipient; esta tabla conserva el origen.
+model DocumentCourse {
+  documentId String
+  courseId   String
+
+  document Document @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  course   Course   @relation(fields: [courseId], references: [id], onDelete: Cascade)
+
+  @@id([documentId, courseId])
+}
+
+model Course {
+  id   String @id @default(cuid())
+  name String // p. ej. "3° Básico A"
+  year Int
+
+  students  Student[]
+  documents DocumentCourse[]
+
+  @@unique([name, year])
+}
+
+model Student {
+  id       String @id @default(cuid())
+  fullName String
+  rut      String @unique
+  courseId String
+
+  course    Course            @relation(fields: [courseId], references: [id])
+  guardians GuardianStudent[]
+
+  @@index([courseId])
+}
+
+model GuardianStudent {
+  guardianId String
+  studentId  String
+
+  guardian User    @relation(fields: [guardianId], references: [id], onDelete: Cascade)
+  student  Student @relation(fields: [studentId], references: [id], onDelete: Cascade)
+
+  @@id([guardianId, studentId])
+  @@index([studentId])
+}
+
+model DownloadLog {
+  id           String   @id @default(cuid())
+  documentId   String
+  userId       String
+  downloadedAt DateTime @default(now())
+  ipAddress    String?
+  userAgent    String?
+
+  document Document @relation(fields: [documentId], references: [id])
+  user     User     @relation(fields: [userId], references: [id])
+
+  @@index([documentId])
+  @@index([userId])
+  @@index([downloadedAt])
+}
+
+model AuditLog {
+  id        String      @id @default(cuid())
+  userId    String?
+  action    AuditAction
+  entity    String
+  entityId  String?
+  metadata  Json?
+  createdAt DateTime    @default(now())
+
+  user User? @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([createdAt])
+  @@index([userId])
+  @@index([entity, entityId])
+}
+
+/// Intentos de inicio de sesión, para el rate limiting (persistente entre instancias serverless).
+model LoginAttempt {
+  id        String   @id @default(cuid())
+  key       String // email normalizado o IP
+  success   Boolean
+  createdAt DateTime @default(now())
+
+  @@index([key, createdAt])
+}
