@@ -39,7 +39,7 @@ async function findDuplicate(rut: string, email: string, exceptId?: string): Pro
 }
 
 function revalidateUsers(userId?: string) {
-  revalidatePath("/usuarios");
+  revalidatePath("/usuarios", "layout");
   if (userId) revalidatePath(`/usuarios/${userId}`);
 }
 

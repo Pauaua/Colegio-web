@@ -10,6 +10,7 @@ import { UserForm } from "@/components/users/user-form";
 import { formatDateTime } from "@/lib/dates";
 import { formatRut } from "@/lib/rut";
 import { requirePermission } from "@/lib/session";
+import { groupForRole, USER_GROUPS, userGroupHref } from "@/lib/user-groups";
 import { getUserForEdit } from "@/server/queries/users";
 
 export const metadata: Metadata = { title: "Editar usuario" };
@@ -23,8 +24,8 @@ export default async function EditUserPage({ params }: PageProps<"/usuarios/[id]
   return (
     <>
       <Button asChild variant="ghost" size="sm" className="mb-4 -ml-2">
-        <Link href="/usuarios">
-          <ArrowLeft /> Volver a usuarios
+        <Link href={userGroupHref(user.role)}>
+          <ArrowLeft /> Volver a {USER_GROUPS[groupForRole(user.role)].label.toLowerCase()}
         </Link>
       </Button>
       <PageHeader title={user.fullName} description={`Cuenta creada el ${formatDateTime(user.createdAt)}`} />

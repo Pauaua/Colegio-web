@@ -13,8 +13,9 @@ import { Field, FieldDescription, FieldError, FieldGroup, FieldLabel } from "@/c
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Spinner } from "@/components/ui/spinner";
-import { ROLE_LABELS, ROLES } from "@/lib/roles";
+import { ROLE_LABELS, ROLES, type Role } from "@/lib/roles";
 import { formatRut } from "@/lib/rut";
+import { userGroupHref } from "@/lib/user-groups";
 import {
   createUserSchema,
   updateUserSchema,
@@ -24,7 +25,8 @@ import {
 import { createUserAction, updateUserAction } from "@/server/actions/users";
 
 type Props =
-  { mode: "create" } | { mode: "edit"; userId: string; defaultValues: UpdateUserInput; isSelf: boolean };
+  | { mode: "create"; defaultRole?: Role }
+  | { mode: "edit"; userId: string; defaultValues: UpdateUserInput; isSelf: boolean };
 
 export function UserForm(props: Props) {
   const router = useRouter();
@@ -35,7 +37,7 @@ export function UserForm(props: Props) {
     resolver: zodResolver(isEdit ? updateUserSchema : createUserSchema),
     defaultValues: isEdit
       ? props.defaultValues
-      : { fullName: "", rut: "", email: "", role: undefined, phone: "", password: "" },
+      : { fullName: "", rut: "", email: "", role: props.defaultRole, phone: "", password: "" },
   });
   const { errors } = form.formState;
 
@@ -48,7 +50,7 @@ export function UserForm(props: Props) {
         return;
       }
       toast.success(isEdit ? "Usuario actualizado" : "Usuario creado");
-      router.push("/usuarios");
+      router.push(userGroupHref(values.role));
       router.refresh();
     }),
   );

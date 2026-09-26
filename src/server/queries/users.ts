@@ -3,6 +3,7 @@ import "server-only";
 import { z } from "zod";
 
 import type { Prisma } from "@/generated/prisma/client";
+import type { Role } from "@/generated/prisma/enums";
 import { prisma } from "@/lib/prisma";
 import { ROLES } from "@/lib/roles";
 
@@ -38,9 +39,11 @@ export type UserListRow = {
   isActive: boolean;
 };
 
-export async function listUsers(filters: UserFilters) {
+/** Lista paginada. Con `roles`, se limita a esos roles (el filtro `rol` solo acota dentro de ellos). */
+export async function listUsers(filters: UserFilters, roles?: readonly Role[]) {
+  const rol = filters.rol && (!roles || roles.includes(filters.rol)) ? filters.rol : undefined;
   const where: Prisma.UserWhereInput = {
-    ...(filters.rol ? { role: filters.rol } : {}),
+    ...(rol ? { role: rol } : roles ? { role: { in: [...roles] } } : {}),
     ...(filters.estado ? { isActive: filters.estado === "activos" } : {}),
     ...(filters.q
       ? {
@@ -65,6 +68,20 @@ export async function listUsers(filters: UserFilters) {
   ]);
 
   return { rows: users as UserListRow[], total, pageCount: Math.max(1, Math.ceil(total / USERS_PAGE_SIZE)) };
+}
+
+/** Cantidad de usuarios por rol, total y activos. */
+export async function countUsersByRole() {
+  const groups = await prisma.user.groupBy({ by: ["role", "isActive"], _count: { _all: true } });
+  const counts = Object.fromEntries(ROLES.map((role) => [role, { total: 0, active: 0 }])) as Record<
+    Role,
+    { total: number; active: number }
+  >;
+  for (const group of groups) {
+    counts[group.role].total += group._count._all;
+    if (group.isActive) counts[group.role].active += group._count._all;
+  }
+  return counts;
 }
 
 export async function getUserForEdit(id: string) {
