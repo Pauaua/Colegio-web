@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect, useRef, useState } from "react";
 import {
   Area,
   AreaChart,
@@ -14,8 +15,8 @@ import {
 } from "recharts";
 
 /*
- * Gráficos de una sola serie: un único tono (--chart-mark, periwinkle de la paleta
- * un paso más oscuro para llegar a 3:1 sobre la tarjeta). Sin leyenda: el título
+ * Gráficos de una sola serie: un único tono (--chart-mark, marino suave de la paleta
+ * con al menos 3:1 sobre la tarjeta). Sin leyenda: el título
  * de la tarjeta nombra la serie. Textos con tokens de texto, nunca con el color de la marca.
  */
 
@@ -42,37 +43,88 @@ function ChartTooltip({ active, payload, labelFor }: TooltipProps) {
   );
 }
 
+/** Ancho actual de un elemento (0 antes de montar). */
+function useElementWidth<T extends HTMLElement>() {
+  const ref = useRef<T>(null);
+  const [width, setWidth] = useState(0);
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    const observer = new ResizeObserver(([entry]) => setWidth(entry.contentRect.width));
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, []);
+  return [ref, width] as const;
+}
+
+/** Espacio mínimo por barra para que los nombres del eje X quepan sin encimarse. */
+const MIN_COLUMN_WIDTH = 80;
+
 export function DocumentsByTypeChart({ data }: { data: { name: string; count: number }[] }) {
+  const [ref, width] = useElementWidth<HTMLDivElement>();
+  // Si no caben las columnas, barras horizontales con el nombre completo a la izquierda.
+  const horizontal = width > 0 && width / Math.max(data.length, 1) < MIN_COLUMN_WIDTH;
+  const tooltip = (
+    <Tooltip
+      cursor={{ fill: "var(--muted)" }}
+      content={({ active, payload }) => (
+        <ChartTooltip active={active} payload={payload} labelFor={(p) => String(p.name)} />
+      )}
+    />
+  );
+
   return (
-    <div className="h-72 w-full">
+    <div ref={ref} className="h-72 w-full">
       <ResponsiveContainer width="100%" height="100%">
-        <BarChart data={data} margin={{ top: 24, right: 8, bottom: 0, left: -16 }}>
-          <CartesianGrid vertical={false} stroke="var(--chart-grid)" />
-          <XAxis
-            dataKey="name"
-            tickLine={false}
-            axisLine={{ stroke: "var(--chart-grid)" }}
-            tick={AXIS_TICK}
-            interval={0}
-            tickFormatter={(value: string) => (value.length > 12 ? `${value.slice(0, 11)}…` : value)}
-          />
-          <YAxis allowDecimals={false} tickLine={false} axisLine={false} tick={AXIS_TICK} />
-          <Tooltip
-            cursor={{ fill: "var(--muted)" }}
-            content={({ active, payload }) => (
-              <ChartTooltip active={active} payload={payload} labelFor={(p) => String(p.name)} />
-            )}
-          />
-          <Bar dataKey="count" fill="var(--chart-mark)" radius={[4, 4, 0, 0]} maxBarSize={24}>
-            <LabelList
-              dataKey="count"
-              position="top"
-              fill="var(--foreground)"
-              fontSize={12}
-              fontWeight={600}
+        {horizontal ? (
+          <BarChart data={data} layout="vertical" margin={{ top: 0, right: 28, bottom: 0, left: 0 }}>
+            <CartesianGrid horizontal={false} stroke="var(--chart-grid)" />
+            <XAxis type="number" allowDecimals={false} tickLine={false} axisLine={false} tick={AXIS_TICK} />
+            <YAxis
+              type="category"
+              dataKey="name"
+              width={112}
+              tickLine={false}
+              axisLine={{ stroke: "var(--chart-grid)" }}
+              tick={AXIS_TICK}
+              interval={0}
+              tickFormatter={(value: string) => (value.length > 14 ? `${value.slice(0, 13)}…` : value)}
             />
-          </Bar>
-        </BarChart>
+            {tooltip}
+            <Bar dataKey="count" fill="var(--chart-mark)" radius={[0, 4, 4, 0]} maxBarSize={20}>
+              <LabelList
+                dataKey="count"
+                position="right"
+                fill="var(--foreground)"
+                fontSize={12}
+                fontWeight={600}
+              />
+            </Bar>
+          </BarChart>
+        ) : (
+          <BarChart data={data} margin={{ top: 24, right: 8, bottom: 0, left: -16 }}>
+            <CartesianGrid vertical={false} stroke="var(--chart-grid)" />
+            <XAxis
+              dataKey="name"
+              tickLine={false}
+              axisLine={{ stroke: "var(--chart-grid)" }}
+              tick={AXIS_TICK}
+              interval={0}
+              tickFormatter={(value: string) => (value.length > 12 ? `${value.slice(0, 11)}…` : value)}
+            />
+            <YAxis allowDecimals={false} tickLine={false} axisLine={false} tick={AXIS_TICK} />
+            {tooltip}
+            <Bar dataKey="count" fill="var(--chart-mark)" radius={[4, 4, 0, 0]} maxBarSize={24}>
+              <LabelList
+                dataKey="count"
+                position="top"
+                fill="var(--foreground)"
+                fontSize={12}
+                fontWeight={600}
+              />
+            </Bar>
+          </BarChart>
+        )}
       </ResponsiveContainer>
     </div>
   );

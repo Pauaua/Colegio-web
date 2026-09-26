@@ -112,22 +112,68 @@ function FiltersForm({ filters }: { filters: AuditFilters }) {
   );
 }
 
-function TableShell({ headers, children }: { headers: string[]; children: React.ReactNode }) {
+type AuditRow = {
+  id: string;
+  date: Date;
+  userName: string;
+  userRole?: keyof typeof ROLE_LABELS;
+  /** Tercera columna: documento descargado o acción realizada. */
+  main: React.ReactNode;
+  /** Cuarta columna: IP o detalle de la acción. */
+  detail: React.ReactNode;
+  /** En celular el detalle va sin encabezado, así que puede necesitar su propia etiqueta. */
+  mobileDetail?: React.ReactNode;
+};
+
+/** Tabla en pantallas medianas y grandes; tarjetas apiladas en celular. */
+function AuditList({ headers, rows }: { headers: [string, string, string, string]; rows: AuditRow[] }) {
   return (
-    <div className="overflow-x-auto rounded-2xl border bg-card shadow-soft">
-      <Table>
-        <TableHeader>
-          <TableRow className="bg-secondary-soft/50 hover:bg-secondary-soft/50">
-            {headers.map((header) => (
-              <TableHead key={header} className="h-12 font-semibold first:pl-5 last:pr-5">
-                {header}
-              </TableHead>
+    <>
+      <div className="hidden overflow-x-auto rounded-2xl border bg-card shadow-soft md:block">
+        <Table>
+          <TableHeader>
+            <TableRow className="bg-secondary-soft/50 hover:bg-secondary-soft/50">
+              {headers.map((header) => (
+                <TableHead key={header} className="h-12 font-semibold first:pl-5 last:pr-5">
+                  {header}
+                </TableHead>
+              ))}
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {rows.map((row) => (
+              <TableRow key={row.id}>
+                <TableCell className="py-3 pl-5 whitespace-nowrap tabular-nums">
+                  {formatDateTime(row.date)}
+                </TableCell>
+                <TableCell className="py-3">
+                  <span className="font-medium">{row.userName}</span>
+                  {row.userRole && (
+                    <span className="block text-xs text-muted-foreground">{ROLE_LABELS[row.userRole]}</span>
+                  )}
+                </TableCell>
+                <TableCell className="py-3">{row.main}</TableCell>
+                <TableCell className="py-3 pr-5">{row.detail}</TableCell>
+              </TableRow>
             ))}
-          </TableRow>
-        </TableHeader>
-        <TableBody>{children}</TableBody>
-      </Table>
-    </div>
+          </TableBody>
+        </Table>
+      </div>
+
+      <ul className="space-y-3 md:hidden">
+        {rows.map((row) => (
+          <li key={row.id} className="space-y-1 rounded-2xl border bg-card p-4 shadow-soft">
+            <p className="text-xs text-muted-foreground tabular-nums">{formatDateTime(row.date)}</p>
+            <div className="font-semibold break-words">{row.main}</div>
+            <div className="text-sm break-words">{row.mobileDetail ?? row.detail}</div>
+            <p className="text-sm text-muted-foreground">
+              {row.userName}
+              {row.userRole && ` · ${ROLE_LABELS[row.userRole]}`}
+            </p>
+          </li>
+        ))}
+      </ul>
+    </>
   );
 }
 
@@ -144,31 +190,26 @@ async function DownloadsTable({ filters }: { filters: AuditFilters }) {
   }
   return (
     <>
-      <TableShell headers={["Fecha", "Usuario", "Documento", "IP"]}>
-        {rows.map((row) => (
-          <TableRow key={row.id}>
-            <TableCell className="py-3 pl-5 whitespace-nowrap tabular-nums">
-              {formatDateTime(row.downloadedAt)}
-            </TableCell>
-            <TableCell className="py-3">
-              <span className="font-medium">{row.user.fullName}</span>
-              <span className="block text-xs text-muted-foreground">{ROLE_LABELS[row.user.role]}</span>
-            </TableCell>
-            <TableCell className="py-3">
-              {row.document.isDeleted ? (
-                <span className="text-muted-foreground">{row.document.title} (eliminado)</span>
-              ) : (
-                <Link href={`/documentos/${row.document.id}`} className="underline-offset-4 hover:underline">
-                  {row.document.title}
-                </Link>
-              )}
-            </TableCell>
-            <TableCell className="py-3 pr-5 text-muted-foreground tabular-nums">
-              {row.ipAddress ?? "—"}
-            </TableCell>
-          </TableRow>
-        ))}
-      </TableShell>
+      <AuditList
+        headers={["Fecha", "Usuario", "Documento", "IP"]}
+        rows={rows.map((row) => ({
+          id: row.id,
+          date: row.downloadedAt,
+          userName: row.user.fullName,
+          userRole: row.user.role,
+          main: row.document.isDeleted ? (
+            <span className="text-muted-foreground">{row.document.title} (eliminado)</span>
+          ) : (
+            <Link href={`/documentos/${row.document.id}`} className="underline-offset-4 hover:underline">
+              {row.document.title}
+            </Link>
+          ),
+          detail: <span className="text-muted-foreground tabular-nums">{row.ipAddress ?? "—"}</span>,
+          mobileDetail: row.ipAddress ? (
+            <span className="text-muted-foreground tabular-nums">IP {row.ipAddress}</span>
+          ) : null,
+        }))}
+      />
       <Pagination
         page={filters.page}
         pageCount={pageCount}
@@ -193,22 +234,18 @@ async function ActionsTable({ filters }: { filters: AuditFilters }) {
   }
   return (
     <>
-      <TableShell headers={["Fecha", "Usuario", "Acción", "Detalle"]}>
-        {rows.map((row) => {
+      <AuditList
+        headers={["Fecha", "Usuario", "Acción", "Detalle"]}
+        rows={rows.map((row) => {
           const target = describeAuditTarget(row.metadata);
-          return (
-            <TableRow key={row.id}>
-              <TableCell className="py-3 pl-5 whitespace-nowrap tabular-nums">
-                {formatDateTime(row.createdAt)}
-              </TableCell>
-              <TableCell className="py-3">
-                <span className="font-medium">{row.user?.fullName ?? "Sistema"}</span>
-                {row.user && (
-                  <span className="block text-xs text-muted-foreground">{ROLE_LABELS[row.user.role]}</span>
-                )}
-              </TableCell>
-              <TableCell className="py-3">{AUDIT_ACTION_LABELS[row.action]}</TableCell>
-              <TableCell className="py-3 pr-5">
+          return {
+            id: row.id,
+            date: row.createdAt,
+            userName: row.user?.fullName ?? "Sistema",
+            userRole: row.user?.role,
+            main: AUDIT_ACTION_LABELS[row.action],
+            detail: (
+              <>
                 {row.entity === "Document" && row.entityId && target ? (
                   <Link href={`/documentos/${row.entityId}`} className="underline-offset-4 hover:underline">
                     {target}
@@ -221,11 +258,11 @@ async function ActionsTable({ filters }: { filters: AuditFilters }) {
                   (target ?? <span className="text-muted-foreground">—</span>)
                 )}
                 <AuditExtra metadata={row.metadata} />
-              </TableCell>
-            </TableRow>
-          );
+              </>
+            ),
+          };
         })}
-      </TableShell>
+      />
       <Pagination
         page={filters.page}
         pageCount={pageCount}
