@@ -31,12 +31,12 @@ const day = (month: number, date: number) => new Date(Date.UTC(YEAR, month - 1, 
 const uploadedAt = (month: number, date: number) => new Date(Date.UTC(YEAR, month - 1, date, 13, 30));
 
 const DOCUMENT_TYPES = [
-  { code: "MEMO", name: "Memo", color: "#A8C8F0" },
-  { code: "OFICIO", name: "Oficio", color: "#C3B1E8" },
-  { code: "CITACION", name: "Citación", color: "#F2C1CC" },
-  { code: "ACUERDO", name: "Acuerdo", color: "#B8E3D0" },
-  { code: "ACTA", name: "Acta", color: "#F6E0B5" },
-  { code: "PERMISO", name: "Permiso administrativo", color: "#B5B8F0" },
+  { code: "MEMO", name: "Memo", color: "#B9C9E6" },
+  { code: "OFICIO", name: "Oficio", color: "#D9CDEA" },
+  { code: "CITACION", name: "Citación", color: "#F2C7D0" },
+  { code: "ACUERDO", name: "Acuerdo", color: "#C4E3D2" },
+  { code: "ACTA", name: "Acta", color: "#ECD9A6" },
+  { code: "PERMISO", name: "Permiso administrativo", color: "#BFE0EC" },
 ] as const;
 
 type TypeCode = (typeof DOCUMENT_TYPES)[number]["code"];

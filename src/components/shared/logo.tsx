@@ -10,8 +10,9 @@ export function Logo({ className, compact = false }: { className?: string; compa
       <Image
         src={logo}
         alt="Escuela F N° 732 Chorombo Alto"
-        className="size-12 shrink-0 rounded-full shadow-soft"
-        sizes="48px"
+        // La versión compacta va en la barra superior (h-16), que no admite el tamaño completo.
+        className={cn("shrink-0 rounded-full shadow-soft", compact ? "size-12" : "size-18")}
+        sizes={compact ? "48px" : "72px"}
         priority
       />
       {!compact && (
