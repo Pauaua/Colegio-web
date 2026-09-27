@@ -96,7 +96,18 @@ export async function getUserForEdit(id: string) {
       phone: true,
       isActive: true,
       createdAt: true,
-      students: { select: { student: { select: { fullName: true, course: { select: { name: true } } } } } },
+      students: {
+        select: {
+          student: {
+            select: { id: true, fullName: true, rut: true, course: { select: { name: true, year: true } } },
+          },
+        },
+        orderBy: { student: { fullName: "asc" } },
+      },
+      teachingCourses: {
+        select: { course: { select: { id: true, name: true, year: true } } },
+        orderBy: [{ course: { year: "desc" } }, { course: { name: "asc" } }],
+      },
       _count: { select: { authoredDocuments: true, downloads: true } },
     },
   });

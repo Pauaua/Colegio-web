@@ -27,9 +27,46 @@ const userFieldsSchema = z.object({
     .trim()
     .max(20, { error: "Máximo 20 caracteres" })
     .regex(/^[+\d\s()-]*$/, { error: "Solo números, espacios y +" }),
+  /** Cursos en los que hace clases (solo docentes; opcional). */
+  courseIds: z.array(z.string().min(1)).max(30, { error: "Máximo 30 cursos" }),
 });
 
-export const createUserSchema = userFieldsSchema.extend({ password: passwordSchema });
+/** Valor del selector de estudiante que indica "matricular a un estudiante nuevo". */
+export const NEW_STUDENT = "__nuevo__";
+
+/**
+ * Pupilo que se vincula al crear un apoderado: un estudiante ya matriculado del curso
+ * elegido, o uno nuevo (nombre y RUT) que se matricula en ese curso en la misma operación.
+ */
+export const pupilSchema = z
+  .object({
+    courseId: z.string().min(1, { error: "Elige un curso" }),
+    studentId: z.string(),
+    fullName: z.string().trim().max(120, { error: "Máximo 120 caracteres" }),
+    rut: z.string().trim(),
+  })
+  .superRefine((pupil, ctx) => {
+    if (pupil.studentId !== NEW_STUDENT) {
+      if (!pupil.studentId)
+        ctx.addIssue({ code: "custom", message: "Elige un estudiante", path: ["studentId"] });
+      return;
+    }
+    if (pupil.fullName.length < 3) {
+      ctx.addIssue({ code: "custom", message: "Ingresa el nombre del estudiante", path: ["fullName"] });
+    }
+    if (!isValidRut(pupil.rut)) {
+      ctx.addIssue({ code: "custom", message: "RUT inválido (revisa el dígito verificador)", path: ["rut"] });
+    }
+  });
+export type PupilInput = z.infer<typeof pupilSchema>;
+
+export const createUserSchema = userFieldsSchema
+  .extend({ password: passwordSchema, pupils: z.array(pupilSchema).max(10, { error: "Máximo 10 pupilos" }) })
+  // Un apoderado sin pupilos no recibe nada de sus cursos: se vincula al crearlo.
+  .refine((d) => d.role !== "APODERADO" || d.pupils.length > 0, {
+    error: "Vincula al menos un pupilo al apoderado",
+    path: ["pupils"],
+  });
 export type CreateUserInput = z.infer<typeof createUserSchema>;
 
 /** Al editar, la contraseña es opcional: vacía = no se cambia. */

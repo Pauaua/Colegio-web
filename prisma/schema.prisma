@@ -69,6 +69,7 @@ model User {
   authoredDocuments Document[]
   recipientOf       DocumentRecipient[]
   students          GuardianStudent[]
+  teachingCourses   TeacherCourse[]
   downloads         DownloadLog[]
   auditLogs         AuditLog[]
 
@@ -169,6 +170,7 @@ model Course {
   year Int
 
   students  Student[]
+  teachers  TeacherCourse[]
   documents DocumentCourse[]
 
   @@unique([name, year])
@@ -195,6 +197,18 @@ model GuardianStudent {
 
   @@id([guardianId, studentId])
   @@index([studentId])
+}
+
+/// Cursos en los que hace clases un docente (opcional; puede tener varios).
+model TeacherCourse {
+  teacherId String
+  courseId  String
+
+  teacher User   @relation(fields: [teacherId], references: [id], onDelete: Cascade)
+  course  Course @relation(fields: [courseId], references: [id], onDelete: Cascade)
+
+  @@id([teacherId, courseId])
+  @@index([courseId])
 }
 
 model DownloadLog {

@@ -284,6 +284,7 @@ async function resetDatabase() {
   await prisma.document.deleteMany();
   await prisma.documentType.deleteMany();
   await prisma.guardianStudent.deleteMany();
+  await prisma.teacherCourse.deleteMany();
   await prisma.student.deleteMany();
   await prisma.course.deleteMany();
   await prisma.loginAttempt.deleteMany();
@@ -319,6 +320,7 @@ async function main() {
   console.log("🏫 Cursos y estudiantes…");
   const course3B = await prisma.course.create({ data: { name: "3° Básico A", year: YEAR } });
   const course1M = await prisma.course.create({ data: { name: "1° Medio B", year: YEAR } });
+  await prisma.teacherCourse.create({ data: { teacherId: users.docente.id, courseId: course3B.id } });
 
   const students = [
     {

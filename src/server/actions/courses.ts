@@ -13,9 +13,11 @@ async function authorizeCourses() {
   return authorize("course:manage");
 }
 
-function revalidateCourses(courseId?: string) {
+function revalidateCourses(courseId?: string, guardianId?: string) {
   revalidatePath("/cursos");
   if (courseId) revalidatePath(`/cursos/${courseId}`);
+  // El perfil del apoderado también muestra sus pupilos.
+  if (guardianId) revalidatePath(`/usuarios/${guardianId}`);
 }
 
 // ─── Cursos ─────────────────────────────────────────────────────────────
@@ -256,7 +258,7 @@ export async function linkGuardianAction(studentId: string, guardianId: string):
       tx,
     );
   });
-  revalidateCourses(student.courseId);
+  revalidateCourses(student.courseId, guardian.id);
   return { ok: true };
 }
 
@@ -288,6 +290,75 @@ export async function unlinkGuardianAction(studentId: string, guardianId: string
       tx,
     );
   });
-  revalidateCourses(link.student.courseId);
+  revalidateCourses(link.student.courseId, link.guardianId);
+  return { ok: true };
+}
+
+/** Desde el perfil del apoderado: agrega un estudiante nuevo al curso y lo vincula como pupilo. */
+export async function createStudentForGuardianAction(
+  courseId: string,
+  guardianId: string,
+  input: unknown,
+): Promise<ActionResult> {
+  let actor;
+  try {
+    actor = await authorizeCourses();
+  } catch (error) {
+    return authFailure(error);
+  }
+  const parsed = studentSchema.safeParse(input);
+  if (!parsed.success) return { ok: false, error: parsed.error.issues[0]?.message ?? "Datos inválidos" };
+
+  const [course, guardian] = await Promise.all([
+    prisma.course.findUnique({ where: { id: String(courseId) } }),
+    prisma.user.findUnique({ where: { id: String(guardianId) } }),
+  ]);
+  if (!course) return { ok: false, error: "El curso no existe" };
+  if (!guardian || guardian.role !== "APODERADO" || !guardian.isActive) {
+    return { ok: false, error: "Solo se pueden vincular usuarios apoderados activos" };
+  }
+
+  const rut = normalizeRut(parsed.data.rut);
+  if (await prisma.student.findUnique({ where: { rut } })) {
+    return { ok: false, error: "Ya existe un estudiante con ese RUT: búscalo en su curso" };
+  }
+
+  try {
+    await prisma.$transaction(async (tx) => {
+      const student = await tx.student.create({
+        data: {
+          fullName: parsed.data.fullName,
+          rut,
+          courseId: course.id,
+          guardians: { create: { guardianId: guardian.id } },
+        },
+        select: { id: true },
+      });
+      await logAudit(
+        {
+          userId: actor.id,
+          action: "CREATE_STUDENT",
+          entity: "Student",
+          entityId: student.id,
+          metadata: { fullName: parsed.data.fullName, course: `${course.name} ${course.year}` },
+        },
+        tx,
+      );
+      await logAudit(
+        {
+          userId: actor.id,
+          action: "LINK_GUARDIAN",
+          entity: "Student",
+          entityId: student.id,
+          metadata: { fullName: parsed.data.fullName, guardian: guardian.fullName },
+        },
+        tx,
+      );
+    });
+  } catch (error) {
+    if (isUniqueViolation(error)) return { ok: false, error: "Ya existe un estudiante con ese RUT" };
+    throw error;
+  }
+  revalidateCourses(course.id, guardian.id);
   return { ok: true };
 }

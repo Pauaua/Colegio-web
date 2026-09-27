@@ -1,4 +1,4 @@
-import { ArrowLeft, GraduationCap } from "lucide-react";
+import { ArrowLeft, GraduationCap, Presentation } from "lucide-react";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
@@ -46,6 +46,34 @@ export default async function CourseDetailPage({ params }: PageProps<"/cursos/[i
       />
 
       <div className="space-y-6">
+        <SectionCard
+          title="Docentes"
+          description="Se asignan desde el perfil de cada docente, en Usuarios."
+          action={
+            <Button asChild variant="outline" size="sm">
+              <Link href="/usuarios/docentes">Ver docentes</Link>
+            </Button>
+          }
+        >
+          {course.teachers.length === 0 ? (
+            <p className="text-sm text-muted-foreground">Este curso no tiene docentes asignados.</p>
+          ) : (
+            <ul className="flex flex-wrap gap-2">
+              {course.teachers.map(({ teacher }) => (
+                <li key={teacher.id}>
+                  <Link
+                    href={`/usuarios/${teacher.id}`}
+                    className="inline-flex items-center gap-1.5 rounded-full bg-primary-soft px-3 py-1.5 text-sm hover:underline"
+                  >
+                    <Presentation className="size-4" /> {teacher.fullName}
+                    {!teacher.isActive && <span className="text-xs text-muted-foreground">(inactivo)</span>}
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          )}
+        </SectionCard>
+
         <SectionCard title="Agregar estudiante">
           <AddStudentForm courseId={course.id} />
         </SectionCard>

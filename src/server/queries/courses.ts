@@ -21,6 +21,19 @@ export async function listCourses() {
   }));
 }
 
+/** Cursos con sus estudiantes, para vincular pupilos desde el perfil de un apoderado. */
+export async function listCoursesWithStudents() {
+  return prisma.course.findMany({
+    orderBy: [{ year: "desc" }, { name: "asc" }],
+    select: {
+      id: true,
+      name: true,
+      year: true,
+      students: { select: { id: true, fullName: true }, orderBy: { fullName: "asc" } },
+    },
+  });
+}
+
 export async function getCourseDetail(id: string) {
   return prisma.course.findUnique({
     where: { id },
@@ -28,6 +41,10 @@ export async function getCourseDetail(id: string) {
       id: true,
       name: true,
       year: true,
+      teachers: {
+        orderBy: { teacher: { fullName: "asc" } },
+        select: { teacher: { select: { id: true, fullName: true, isActive: true } } },
+      },
       students: {
         orderBy: { fullName: "asc" },
         select: {

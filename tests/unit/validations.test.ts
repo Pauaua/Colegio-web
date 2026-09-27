@@ -3,7 +3,12 @@ import { describe, expect, it } from "vitest";
 import { parseDocumentFilters } from "@/lib/document-filters";
 import { buildFileKey, extensionMatchesMime, matchesMagicBytes, slugify } from "@/lib/files";
 import { createDocumentSchema, fileMetaSchema } from "@/lib/validations/document";
-import { changePasswordSchema, createUserSchema, updateUserSchema } from "@/lib/validations/user";
+import {
+  changePasswordSchema,
+  createUserSchema,
+  NEW_STUDENT,
+  updateUserSchema,
+} from "@/lib/validations/user";
 import { FILE_KEY_PATTERN } from "@/lib/storage";
 
 describe("archivos", () => {
@@ -114,6 +119,8 @@ describe("usuarios", () => {
     role: "DOCENTE",
     phone: "",
     password: "Clave2026",
+    courseIds: [],
+    pupils: [],
   };
 
   it("valida RUT con dígito verificador", () => {
@@ -124,6 +131,48 @@ describe("usuarios", () => {
   it("exige contraseña con letras y números al crear", () => {
     expect(createUserSchema.safeParse({ ...user, password: "12345678" }).success).toBe(false);
     expect(createUserSchema.safeParse({ ...user, password: "corta1" }).success).toBe(false);
+  });
+
+  describe("apoderado con pupilos", () => {
+    const guardian = { ...user, role: "APODERADO" };
+    const existing = { courseId: "c1", studentId: "s1", fullName: "", rut: "" };
+    const brandNew = { courseId: "c1", studentId: NEW_STUDENT, fullName: "Tomás Rojas", rut: "24.567.123-7" };
+    const issuePaths = (input: unknown) =>
+      createUserSchema.safeParse(input).error?.issues.map((i) => i.path.join(".")) ?? [];
+
+    it("exige al menos un pupilo para no dejar apoderados sin estudiantes", () => {
+      expect(issuePaths(guardian)).toContain("pupils");
+      expect(createUserSchema.safeParse({ ...guardian, pupils: [existing] }).success).toBe(true);
+    });
+
+    it("los otros roles no necesitan pupilos", () => {
+      expect(createUserSchema.safeParse(user).success).toBe(true);
+    });
+
+    it("acepta un estudiante nuevo con nombre y RUT válidos", () => {
+      expect(createUserSchema.safeParse({ ...guardian, pupils: [brandNew, existing] }).success).toBe(true);
+    });
+
+    it("pide curso, estudiante y, si es nuevo, nombre y RUT válido", () => {
+      expect(issuePaths({ ...guardian, pupils: [{ ...existing, courseId: "" }] })).toContain(
+        "pupils.0.courseId",
+      );
+      expect(issuePaths({ ...guardian, pupils: [{ ...existing, studentId: "" }] })).toContain(
+        "pupils.0.studentId",
+      );
+      expect(issuePaths({ ...guardian, pupils: [{ ...brandNew, fullName: "" }] })).toContain(
+        "pupils.0.fullName",
+      );
+      expect(issuePaths({ ...guardian, pupils: [{ ...brandNew, rut: "24.567.123-9" }] })).toContain(
+        "pupils.0.rut",
+      );
+    });
+  });
+
+  it("los cursos del docente son opcionales", () => {
+    expect(createUserSchema.safeParse({ ...user, courseIds: [] }).success).toBe(true);
+    expect(createUserSchema.safeParse({ ...user, courseIds: ["c1", "c2"] }).success).toBe(true);
+    expect(updateUserSchema.safeParse({ ...user, password: "", courseIds: ["c1"] }).success).toBe(true);
   });
 
   it("al editar, la contraseña vacía significa no cambiarla", () => {

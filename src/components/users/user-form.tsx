@@ -3,16 +3,27 @@
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Save } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { useTransition } from "react";
-import { Controller, useForm } from "react-hook-form";
+import { useEffect, useTransition } from "react";
+import {
+  Controller,
+  useForm,
+  useWatch,
+  type Control,
+  type FieldErrors,
+  type UseFormRegister,
+  type UseFormReturn,
+  type UseFormSetValue,
+} from "react-hook-form";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Field, FieldDescription, FieldError, FieldGroup, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Spinner } from "@/components/ui/spinner";
+import { EMPTY_PUPIL, PupilsField, type PupilCourseOption } from "@/components/users/pupils-field";
 import { ROLE_LABELS, ROLES, type Role } from "@/lib/roles";
 import { formatRut } from "@/lib/rut";
 import { userGroupHref } from "@/lib/user-groups";
@@ -24,9 +35,17 @@ import {
 } from "@/lib/validations/user";
 import { createUserAction, updateUserAction } from "@/server/actions/users";
 
+type CourseOption = { id: string; name: string; year: number };
+
 type Props =
-  | { mode: "create"; defaultRole?: Role }
-  | { mode: "edit"; userId: string; defaultValues: UpdateUserInput; isSelf: boolean };
+  | { mode: "create"; defaultRole?: Role; courses: PupilCourseOption[] }
+  | {
+      mode: "edit";
+      userId: string;
+      defaultValues: UpdateUserInput;
+      isSelf: boolean;
+      courses: CourseOption[];
+    };
 
 export function UserForm(props: Props) {
   const router = useRouter();
@@ -37,9 +56,30 @@ export function UserForm(props: Props) {
     resolver: zodResolver(isEdit ? updateUserSchema : createUserSchema),
     defaultValues: isEdit
       ? props.defaultValues
-      : { fullName: "", rut: "", email: "", role: props.defaultRole, phone: "", password: "" },
+      : {
+          fullName: "",
+          rut: "",
+          email: "",
+          role: props.defaultRole,
+          phone: "",
+          password: "",
+          courseIds: [],
+          pupils: props.defaultRole === "APODERADO" ? [{ ...EMPTY_PUPIL }] : [],
+        },
   });
   const { errors } = form.formState;
+
+  // Al crear un apoderado se piden sus pupilos; con otro rol, la lista se vacía.
+  const role = useWatch({ control: form.control, name: "role" });
+  const showPupils = !isEdit && role === "APODERADO";
+  const initialRole = isEdit ? props.defaultValues.role : undefined;
+  useEffect(() => {
+    if (isEdit) return;
+    const createForm = form as unknown as UseFormReturn<CreateUserInput>;
+    const current = createForm.getValues("pupils") ?? [];
+    if (role === "APODERADO" && current.length === 0) createForm.setValue("pupils", [{ ...EMPTY_PUPIL }]);
+    if (role !== "APODERADO" && current.length > 0) createForm.setValue("pupils", []);
+  }, [role, isEdit, form]);
 
   const onSubmit = form.handleSubmit((values) =>
     startTransition(async () => {
@@ -128,6 +168,14 @@ export function UserForm(props: Props) {
                 {isEdit && props.isSelf && (
                   <FieldDescription>No puedes cambiar tu propio rol.</FieldDescription>
                 )}
+                {initialRole === "APODERADO" && role !== "APODERADO" && (
+                  <FieldDescription className="text-warning-foreground">
+                    Al guardar, se desvinculará de sus pupilos.
+                  </FieldDescription>
+                )}
+                {isEdit && initialRole !== "APODERADO" && role === "APODERADO" && (
+                  <FieldDescription>Después de guardar, vincúlale sus pupilos en su perfil.</FieldDescription>
+                )}
                 <FieldError errors={[errors.role]} />
               </Field>
               <Field data-invalid={!!errors.phone}>
@@ -136,6 +184,55 @@ export function UserForm(props: Props) {
                 <FieldError errors={[errors.phone]} />
               </Field>
             </div>
+
+            {role === "DOCENTE" && (
+              <Field data-invalid={!!errors.courseIds}>
+                <FieldLabel>Cursos en los que hace clases (opcional)</FieldLabel>
+                {props.courses.length === 0 ? (
+                  <FieldDescription>
+                    No hay cursos creados todavía. Puedes asignárselos más adelante.
+                  </FieldDescription>
+                ) : (
+                  <Controller
+                    control={form.control}
+                    name="courseIds"
+                    render={({ field }) => (
+                      <div className="grid gap-2 rounded-xl border p-3 sm:grid-cols-2">
+                        {props.courses.map((course) => (
+                          <Field key={course.id} orientation="horizontal">
+                            <Checkbox
+                              id={`teacher-course-${course.id}`}
+                              checked={field.value.includes(course.id)}
+                              onCheckedChange={(checked) =>
+                                field.onChange(
+                                  checked
+                                    ? [...field.value, course.id]
+                                    : field.value.filter((v) => v !== course.id),
+                                )
+                              }
+                            />
+                            <FieldLabel htmlFor={`teacher-course-${course.id}`} className="font-normal">
+                              {course.name} <span className="text-muted-foreground">{course.year}</span>
+                            </FieldLabel>
+                          </Field>
+                        ))}
+                      </div>
+                    )}
+                  />
+                )}
+                <FieldError errors={[errors.courseIds]} />
+              </Field>
+            )}
+
+            {showPupils && props.mode === "create" && (
+              <PupilsField
+                control={form.control as unknown as Control<CreateUserInput>}
+                register={form.register as unknown as UseFormRegister<CreateUserInput>}
+                errors={errors as FieldErrors<CreateUserInput>}
+                setValue={form.setValue as unknown as UseFormSetValue<CreateUserInput>}
+                courses={props.courses}
+              />
+            )}
 
             <Field data-invalid={!!errors.password}>
               <FieldLabel htmlFor="password">
