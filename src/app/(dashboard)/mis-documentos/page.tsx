@@ -1,7 +1,8 @@
-import { CheckCheck, Inbox, PartyPopper } from "lucide-react";
+import { CheckCheck, Inbox, MessageSquareReply, PartyPopper } from "lucide-react";
 import type { Metadata } from "next";
 import Link from "next/link";
 
+import { CitationResponseBadge } from "@/components/citations/citation-badges";
 import { DocumentStatusBadge, DocumentTypeBadge } from "@/components/documents/badges";
 import { AcknowledgeButton } from "@/components/documents/document-actions";
 import { EmptyState } from "@/components/shared/empty-state";
@@ -81,25 +82,27 @@ export default async function InboxPage({ searchParams }: PageProps<"/mis-docume
         )
       ) : (
         <ul className="space-y-3">
-          {items.map(({ document: doc, acknowledgedAt }) => {
+          {items.map(({ document: doc, acknowledgedAt, response }) => {
             const isPending = !acknowledgedAt;
+            // Citación vigente: el apoderado la responde en su página (responder confirma la lectura).
+            const isCitation =
+              user.role === "APODERADO" && doc.citationAt !== null && doc.status === "VIGENTE";
+            const needsAction = isCitation ? !response : isPending && doc.requiresAcknowledgement;
             return (
               <li
                 key={doc.id}
                 className={cn(
                   "flex flex-col gap-4 rounded-2xl border bg-card p-5 shadow-soft sm:flex-row sm:items-center sm:justify-between",
-                  isPending &&
-                    doc.requiresAcknowledgement &&
-                    "border-warning-foreground/30 ring-2 ring-warning",
+                  needsAction && "border-warning-foreground/30 ring-2 ring-warning",
                 )}
               >
                 <div className="min-w-0 space-y-2">
                   <div className="flex flex-wrap items-center gap-2">
                     <DocumentTypeBadge name={doc.documentType.name} color={doc.documentType.color} />
                     {doc.status === "ARCHIVADO" && <DocumentStatusBadge status={doc.status} />}
-                    {isPending && doc.requiresAcknowledgement && (
+                    {needsAction && (
                       <span className="rounded-full bg-warning px-2.5 py-0.5 text-xs font-semibold text-warning-foreground">
-                        Pendiente de confirmar lectura
+                        {isCitation ? "Pendiente de responder" : "Pendiente de confirmar lectura"}
                       </span>
                     )}
                   </div>
@@ -116,7 +119,17 @@ export default async function InboxPage({ searchParams }: PageProps<"/mis-docume
                   </p>
                 </div>
                 <div className="shrink-0">
-                  {isPending ? (
+                  {isCitation ? (
+                    response ? (
+                      <CitationResponseBadge response={response} />
+                    ) : (
+                      <Button asChild>
+                        <Link href={`/documentos/${doc.id}`}>
+                          <MessageSquareReply /> Responder citación
+                        </Link>
+                      </Button>
+                    )
+                  ) : isPending ? (
                     <AcknowledgeButton documentId={doc.id} />
                   ) : (
                     <span className="inline-flex items-center gap-1.5 rounded-full bg-success px-3 py-1 text-sm font-semibold text-success-foreground">

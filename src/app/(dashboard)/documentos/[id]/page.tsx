@@ -14,6 +14,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 
+import { CitationResponsePanel } from "@/components/citations/citation-response";
 import { DocumentStatusBadge, DocumentTypeBadge } from "@/components/documents/badges";
 import {
   AcknowledgeButton,
@@ -44,7 +45,10 @@ export default async function DocumentDetailPage({ params }: PageProps<"/documen
   const canEdit = can(user, "document:update", permission);
   const canArchive = can(user, "document:archive", permission);
   const canDelete = can(user, "document:delete", permission);
-  const canAcknowledge = can(user, "document:acknowledge", permission) && !myRecipient?.acknowledgedAt;
+  // Un apoderado citado responde la citación (eso también confirma la lectura).
+  const canRespond = can(user, "citation:respond", permission) && doc.status === "VIGENTE";
+  const canAcknowledge =
+    !canRespond && can(user, "document:acknowledge", permission) && !myRecipient?.acknowledgedAt;
   const visibleTo = doc.visibility.map((v) => ROLE_LABELS[v.role]);
   const acknowledged = recipients.filter((r) => r.acknowledgedAt).length;
 
@@ -97,7 +101,17 @@ export default async function DocumentDetailPage({ params }: PageProps<"/documen
           <AcknowledgeButton documentId={doc.id} className="shrink-0" />
         </div>
       )}
-      {myRecipient?.acknowledgedAt && (
+      {canRespond && myRecipient && (
+        <CitationResponsePanel
+          documentId={doc.id}
+          current={{
+            response: myRecipient.response,
+            comment: myRecipient.responseComment,
+            respondedAt: myRecipient.respondedAt,
+          }}
+        />
+      )}
+      {!canRespond && myRecipient?.acknowledgedAt && (
         <div className="mb-6 flex items-center gap-3 rounded-2xl bg-success p-4 text-success-foreground">
           <CheckCheck className="size-5 shrink-0" />
           <p>

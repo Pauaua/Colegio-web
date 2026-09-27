@@ -114,6 +114,13 @@ export default async function CitationsPage({ searchParams }: PageProps<"/citaci
               <details className="mt-4 text-sm">
                 <summary className="cursor-pointer text-muted-foreground hover:text-foreground">
                   Ver respuestas de {c.summary.total} apoderado{c.summary.total === 1 ? "" : "s"}
+                  {c.summary.readWithoutResponse > 0 && (
+                    <>
+                      {" "}
+                      · {c.summary.readWithoutResponse}{" "}
+                      {c.summary.readWithoutResponse === 1 ? "la leyó" : "la leyeron"} sin responder
+                    </>
+                  )}
                 </summary>
                 <ul className="mt-3 divide-y">
                   {c.recipients.map((r) => (
@@ -129,7 +136,7 @@ export default async function CitationsPage({ searchParams }: PageProps<"/citaci
                             <span className="truncate">“{r.responseComment}”</span>
                           </span>
                         )}
-                        <CitationResponseBadge response={r.response} />
+                        <CitationResponseBadge response={r.response} readAt={r.acknowledgedAt} />
                       </span>
                     </li>
                   ))}

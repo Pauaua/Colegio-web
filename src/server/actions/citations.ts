@@ -1,23 +1,18 @@
 "use server";
 
-import { randomUUID } from "node:crypto";
-
 import { TZDate } from "@date-fns/tz";
-import { format } from "date-fns";
 import { revalidatePath } from "next/cache";
-import { es } from "date-fns/locale";
 
 import { logAudit } from "@/lib/audit";
 import { CITATION_RESPONSE_LABELS, CITATION_TYPE_CODE } from "@/lib/citations";
 import { APP_TIME_ZONE } from "@/lib/dates";
-import { buildFileKey } from "@/lib/files";
-import { buildSimplePdf } from "@/lib/pdf";
 import { prisma } from "@/lib/prisma";
 import { authorize } from "@/lib/session";
 import { deleteFile, putFile } from "@/lib/storage";
 import { createCitationSchema, respondCitationSchema } from "@/lib/validations/citation";
 import { authFailure, isUniqueViolation, type ActionResult } from "@/server/action-utils";
 import type { RecipientOption } from "@/server/actions/documents";
+import { buildCitationPdf } from "@/server/documents/citation-pdf";
 import { loadDocumentFor, resolveRecipients, revalidateDocumentViews } from "@/server/documents/helpers";
 import { getNextFolio } from "@/server/queries/documents";
 
@@ -58,22 +53,18 @@ export async function createCitationAction(input: unknown): Promise<ActionResult
   const today = TZDate.tz(APP_TIME_ZONE);
   const documentDate = new Date(Date.UTC(today.getFullYear(), today.getMonth(), today.getDate()));
   const folioYear = documentDate.getUTCFullYear();
-  const when = format(citationAt, "EEEE d 'de' MMMM 'de' yyyy 'a las' HH:mm 'h'", { locale: es });
   const author = await prisma.user.findUniqueOrThrow({ where: { id: user.id }, select: { fullName: true } });
 
   for (let attempt = 1; attempt <= MAX_FOLIO_ATTEMPTS; attempt++) {
     const folioNumber = await getNextFolio(citationType.id, folioYear);
-    const fileName = `citacion-${folioNumber}-${folioYear}.pdf`;
-    const fileKey = buildFileKey(fileName, randomUUID(), folioYear);
-    const pdf = buildSimplePdf({
-      heading: `Citación N° ${folioNumber}/${folioYear}`,
+    const { fileName, fileKey, pdf } = buildCitationPdf({
+      folioNumber,
+      folioYear,
       title: data.title,
-      meta: [
-        `Fecha y hora: ${when.charAt(0).toUpperCase()}${when.slice(1)}`,
-        `Lugar: ${data.citationPlace}`,
-        `Cita: ${author.fullName}`,
-      ],
-      body: `Estimado(a) apoderado(a): por medio de la presente se le cita a una reunión en la fecha, hora y lugar indicados. ${data.description} Le pedimos confirmar su asistencia en la plataforma del establecimiento.`,
+      description: data.description,
+      citationAt,
+      citationPlace: data.citationPlace,
+      authorName: author.fullName,
     });
     await putFile(fileKey, pdf, "application/pdf");
 
@@ -181,7 +172,9 @@ export async function respondCitationAction(documentId: string, input: unknown):
 }
 
 /** Buscador de apoderados para el formulario de citación. */
-export async function searchCitationRecipientsAction(query: string): Promise<ActionResult<RecipientOption[]>> {
+export async function searchCitationRecipientsAction(
+  query: string,
+): Promise<ActionResult<RecipientOption[]>> {
   try {
     await authorize("citation:create");
   } catch (error) {

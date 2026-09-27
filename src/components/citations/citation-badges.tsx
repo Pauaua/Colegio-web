@@ -1,13 +1,24 @@
-import { CalendarClock, CheckCircle2, Clock, MapPin, XCircle } from "lucide-react";
+import { CalendarClock, CheckCircle2, Clock, Eye, MapPin, XCircle } from "lucide-react";
 
 import { CITATION_RESPONSE_LABELS, type CitationResponse } from "@/lib/citations";
 import { formatDateTime } from "@/lib/dates";
 import { cn } from "@/lib/utils";
 
-/** Estado de respuesta de un citado: siempre con ícono + texto, nunca solo color. */
-export function CitationResponseBadge({ response }: { response: CitationResponse | null }) {
+/**
+ * Estado de respuesta de un citado: siempre con ícono + texto, nunca solo color.
+ * Sin respuesta, distingue si al menos abrió y confirmó la lectura de la citación.
+ */
+export function CitationResponseBadge({
+  response,
+  readAt,
+}: {
+  response: CitationResponse | null;
+  readAt?: Date | null;
+}) {
   const config = !response
-    ? { icon: Clock, label: "Sin respuesta", className: "bg-muted text-muted-foreground" }
+    ? readAt
+      ? { icon: Eye, label: "Leída, sin responder", className: "bg-primary-soft text-foreground" }
+      : { icon: Clock, label: "Sin respuesta", className: "bg-muted text-muted-foreground" }
     : response === "ACEPTADA"
       ? {
           icon: CheckCircle2,

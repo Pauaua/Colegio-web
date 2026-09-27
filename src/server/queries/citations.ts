@@ -67,6 +67,7 @@ export async function listSentCitations(user: CurrentUser, tab: CitationTab) {
         rejected: c.recipients.filter((r) => r.response === "RECHAZADA").length,
         reschedule: c.recipients.filter((r) => r.response === "REPROGRAMAR").length,
         pending: c.recipients.filter((r) => !r.response).length,
+        readWithoutResponse: c.recipients.filter((r) => !r.response && r.acknowledgedAt).length,
       },
     })),
     counts: { proximas: upcomingCount, pasadas: pastCount },

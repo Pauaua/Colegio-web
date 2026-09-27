@@ -1,11 +1,13 @@
 "use server";
 
+import { revalidatePath } from "next/cache";
+
 import type { Prisma } from "@/generated/prisma/client";
 import { logAudit } from "@/lib/audit";
 import { isAllowedMimeType, MAGIC_BYTES_LENGTH, matchesMagicBytes, MAX_FILE_SIZE } from "@/lib/files";
 import { prisma } from "@/lib/prisma";
 import { authorize } from "@/lib/session";
-import { deleteFile, FILE_KEY_PATTERN, getFileInfo, readFileHead } from "@/lib/storage";
+import { deleteFile, FILE_KEY_PATTERN, getFileInfo, putFile, readFileHead } from "@/lib/storage";
 import { createDocumentSchema, documentFormSchema, folioSuggestionSchema } from "@/lib/validations/document";
 import {
   authFailure,
@@ -13,6 +15,7 @@ import {
   uniqueViolationFields,
   type ActionResult,
 } from "@/server/action-utils";
+import { buildCitationPdf } from "@/server/documents/citation-pdf";
 import { loadDocumentFor, resolveRecipients, revalidateDocumentViews } from "@/server/documents/helpers";
 import { getNextFolio } from "@/server/queries/documents";
 
@@ -206,6 +209,27 @@ export async function updateDocumentAction(documentId: string, input: unknown): 
   const removedRecipients = previousRecipientIds.filter((id) => !recipients.recipientIds.includes(id));
   const addedRecipients = recipients.recipientIds.filter((id) => !previousRecipientIds.includes(id));
 
+  // Las citaciones generadas por la plataforma llevan título, descripción y folio dentro del
+  // PDF: se regenera para que la vista previa y la descarga muestren el texto editado.
+  let newFile: { fileKey: string; fileName: string; fileSize: number } | null = null;
+  if (doc.citationAt && doc.citationPlace && doc.mimeType === "application/pdf") {
+    const author = await prisma.user.findUniqueOrThrow({
+      where: { id: doc.authorId },
+      select: { fullName: true },
+    });
+    const { fileKey, fileName, pdf } = buildCitationPdf({
+      folioNumber: data.folioNumber,
+      folioYear,
+      title: data.title,
+      description: data.description || null,
+      citationAt: doc.citationAt,
+      citationPlace: doc.citationPlace,
+      authorName: author.fullName,
+    });
+    await putFile(fileKey, pdf, "application/pdf");
+    newFile = { fileKey, fileName, fileSize: pdf.length };
+  }
+
   try {
     await prisma.$transaction(async (tx) => {
       await tx.document.update({
@@ -218,6 +242,7 @@ export async function updateDocumentAction(documentId: string, input: unknown): 
           folioYear,
           documentDate,
           requiresAcknowledgement: data.requiresAcknowledgement,
+          ...newFile,
         },
       });
       await tx.documentVisibility.deleteMany({ where: { documentId: doc.id } });
@@ -255,6 +280,7 @@ export async function updateDocumentAction(documentId: string, input: unknown): 
               },
               recipientsAdded: addedRecipients.length,
               recipientsRemoved: removedRecipients.length,
+              pdfRegenerated: newFile ? true : undefined,
             },
           },
         },
@@ -262,6 +288,7 @@ export async function updateDocumentAction(documentId: string, input: unknown): 
       );
     });
   } catch (error) {
+    if (newFile) await deleteFile(newFile.fileKey).catch(() => undefined);
     if (isUniqueViolation(error)) {
       return {
         ok: false,
@@ -271,7 +298,10 @@ export async function updateDocumentAction(documentId: string, input: unknown): 
     throw error;
   }
 
+  // El PDF anterior ya no lo referencia ningún documento.
+  if (newFile) await deleteFile(doc.fileKey).catch(() => undefined);
   revalidateDocumentViews(doc.id);
+  revalidatePath("/citaciones");
   return { ok: true };
 }
 

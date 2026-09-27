@@ -189,6 +189,9 @@ export async function getDocumentDetail(documentId: string, user: CurrentUser) {
         select: {
           userId: true,
           acknowledgedAt: true,
+          response: true,
+          responseComment: true,
+          respondedAt: true,
           user: { select: { fullName: true, role: true } },
         },
         orderBy: { user: { fullName: "asc" } },
@@ -215,7 +218,14 @@ export async function getDocumentDetail(documentId: string, user: CurrentUser) {
     permission: toPermissionDocument(doc),
     // Los no directivos no ven la lista de otros destinatarios.
     recipients: canSeeActivity ? doc.recipients : [],
-    myRecipient: myRecipient ? { acknowledgedAt: myRecipient.acknowledgedAt } : null,
+    myRecipient: myRecipient
+      ? {
+          acknowledgedAt: myRecipient.acknowledgedAt,
+          response: myRecipient.response,
+          responseComment: myRecipient.responseComment,
+          respondedAt: myRecipient.respondedAt,
+        }
+      : null,
     downloads,
     canSeeActivity,
   };
@@ -263,11 +273,13 @@ export async function getInbox(user: CurrentUser, filter: InboxFilter) {
       orderBy: [{ acknowledgedAt: { sort: "asc", nulls: "first" } }, { document: { documentDate: "desc" } }],
       select: {
         acknowledgedAt: true,
+        response: true,
         document: {
           select: {
             id: true,
             title: true,
             description: true,
+            citationAt: true,
             folioNumber: true,
             folioYear: true,
             documentDate: true,

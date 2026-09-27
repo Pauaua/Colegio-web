@@ -68,14 +68,14 @@ export type MiniDocument = {
   author: { fullName: string };
 };
 
-export function DocumentMiniList({
+export function DocumentMiniList<T extends MiniDocument>({
   documents,
   empty,
   trailing,
 }: {
-  documents: MiniDocument[];
+  documents: T[];
   empty: string;
-  trailing?: (doc: MiniDocument) => React.ReactNode;
+  trailing?: (doc: T) => React.ReactNode;
 }) {
   if (documents.length === 0) {
     return <p className="py-6 text-center text-sm text-muted-foreground">{empty}</p>;

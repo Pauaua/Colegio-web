@@ -8,6 +8,7 @@ import {
   GraduationCap,
   Inbox,
   type LucideIcon,
+  MessageSquareReply,
 } from "lucide-react";
 import type { Metadata } from "next";
 import Link from "next/link";
@@ -180,17 +181,26 @@ async function CommunityDashboard({ user }: { user: CurrentUser }) {
             <div>
               <h2 id="pending-title" className="text-lg font-bold">
                 Tienes {data.pending.length}{" "}
-                {data.pending.length === 1 ? "documento pendiente" : "documentos pendientes"} de confirmar
-                lectura
+                {data.pending.length === 1 ? "documento pendiente" : "documentos pendientes"}
               </h2>
-              <p className="text-sm">Revísalos y confirma que los leíste.</p>
+              <p className="text-sm">Responde las citaciones y confirma la lectura de los comunicados.</p>
             </div>
           </div>
           <div className="rounded-xl bg-card p-4 text-card-foreground">
             <DocumentMiniList
               documents={data.pending}
               empty=""
-              trailing={(doc) => <AcknowledgeButton documentId={doc.id} className="shrink-0" />}
+              trailing={(doc) =>
+                doc.awaitingResponse ? (
+                  <Button asChild size="sm" className="shrink-0">
+                    <Link href={`/documentos/${doc.id}`}>
+                      <MessageSquareReply /> Responder
+                    </Link>
+                  </Button>
+                ) : (
+                  <AcknowledgeButton documentId={doc.id} className="shrink-0" />
+                )
+              }
             />
           </div>
         </section>

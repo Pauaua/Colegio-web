@@ -22,9 +22,19 @@ const documentCardSelect = {
   createdAt: true,
   status: true,
   requiresAcknowledgement: true,
+  citationAt: true,
   documentType: { select: { name: true, color: true } },
   author: { select: { fullName: true } },
 } as const;
+
+/** Citación vigente dirigida a un apoderado que todavía no responde. */
+function isAwaitingResponse(
+  role: string,
+  doc: { citationAt: Date | null; status: string },
+  response: string | null,
+) {
+  return role === "APODERADO" && doc.citationAt !== null && doc.status === "VIGENTE" && !response;
+}
 
 // ─── Directivos ─────────────────────────────────────────────────────────
 
@@ -129,7 +139,7 @@ export async function getCommunityDashboard(user: CurrentUser) {
     prisma.documentRecipient.findMany({
       where: { userId: user.id, document: { isDeleted: false } },
       orderBy: { document: { createdAt: "desc" } },
-      select: { acknowledgedAt: true, document: { select: documentCardSelect } },
+      select: { acknowledgedAt: true, response: true, document: { select: documentCardSelect } },
     }),
     user.role === "APODERADO"
       ? prisma.guardianStudent.findMany({
@@ -140,11 +150,20 @@ export async function getCommunityDashboard(user: CurrentUser) {
       : Promise.resolve([]),
   ]);
 
-  const pending = addressed.filter((r) => r.document.requiresAcknowledgement && !r.acknowledgedAt);
+  // Las citaciones quedan pendientes hasta que el apoderado responde (leerlas no basta);
+  // el resto de los documentos, hasta que se confirma la lectura.
+  const pending = addressed.filter((r) =>
+    isAwaitingResponse(user.role, r.document, r.response)
+      ? true
+      : r.document.requiresAcknowledgement && !r.acknowledgedAt,
+  );
 
   return {
     kpis: { visibleCount, addressedCount: addressed.length, pendingCount: pending.length },
-    pending: pending.map((r) => r.document),
+    pending: pending.map((r) => ({
+      ...r.document,
+      awaitingResponse: isAwaitingResponse(user.role, r.document, r.response),
+    })),
     addressed: addressed.slice(0, 5).map((r) => ({ ...r.document, acknowledgedAt: r.acknowledgedAt })),
     recentForRole,
     pupils: pupils.map((p) => p.student),
