@@ -19,6 +19,9 @@ import { DocumentStatusBadge, DocumentTypeBadge } from "./badges";
 
 // Orden, filtros y paginación ocurren en el servidor: la tabla solo usa las features base.
 const features = tableFeatures({});
+
+/** `className` se aplica al encabezado y a las celdas (p. ej. para ocultar la columna en pantallas medianas). */
+type ColumnMeta = { sortField?: DocumentSortField; className?: string };
 const column = createColumnHelper<typeof features, DocumentListRow>();
 
 const columns = column.columns([
@@ -26,12 +29,16 @@ const columns = column.columns([
     header: "Título",
     meta: { sortField: "title" },
     cell: ({ row }) => (
-      <Link
-        href={`/documentos/${row.original.id}`}
-        className="font-semibold underline-offset-4 hover:underline focus-visible:underline"
-      >
-        {row.original.title}
-      </Link>
+      <>
+        <Link
+          href={`/documentos/${row.original.id}`}
+          className="font-semibold underline-offset-4 hover:underline focus-visible:underline"
+        >
+          {row.original.title}
+        </Link>
+        {/* Mientras la columna Autor está oculta, el autor va bajo el título. */}
+        <span className="block text-xs text-muted-foreground 2xl:hidden">{row.original.authorName}</span>
+      </>
     ),
   }),
   column.accessor("typeName", {
@@ -51,7 +58,10 @@ const columns = column.columns([
       <span className="whitespace-nowrap tabular-nums">{formatCalendarDate(getValue())}</span>
     ),
   }),
-  column.accessor("authorName", { header: "Autor", meta: { sortField: "author" } }),
+  column.accessor("authorName", {
+    header: "Autor",
+    meta: { sortField: "author", className: "hidden 2xl:table-cell" },
+  }),
   column.accessor("status", {
     header: "Estado",
     meta: { sortField: "status" },
@@ -115,19 +125,19 @@ export function DocumentsTable({ rows, filters }: { rows: DocumentListRow[]; fil
 
   return (
     <>
-      {/* Escritorio: tabla */}
-      <div className="hidden overflow-hidden rounded-2xl border bg-card shadow-soft md:block">
+      {/* Escritorio (desde xl): tabla. Con 7 columnas no cabe en tablets ni laptops chicas. */}
+      <div className="hidden overflow-x-auto rounded-2xl border bg-card shadow-soft xl:block">
         <Table>
           <TableHeader>
             {table.getHeaderGroups().map((headerGroup) => (
               <TableRow key={headerGroup.id} className="bg-secondary-soft/50 hover:bg-secondary-soft/50">
                 {headerGroup.headers.map((header) => {
-                  const meta = header.column.columnDef.meta as { sortField?: DocumentSortField } | undefined;
+                  const meta = header.column.columnDef.meta as ColumnMeta | undefined;
                   const isSorted = meta?.sortField === filters.sort;
                   return (
                     <TableHead
                       key={header.id}
-                      className="h-12 font-semibold first:pl-5 last:pr-5"
+                      className={cn("h-12 font-semibold first:pl-5 last:pr-5", meta?.className)}
                       aria-sort={isSorted ? (filters.dir === "asc" ? "ascending" : "descending") : undefined}
                     >
                       {meta?.sortField ? (
@@ -149,7 +159,13 @@ export function DocumentsTable({ rows, filters }: { rows: DocumentListRow[]; fil
             {table.getRowModel().rows.map((row) => (
               <TableRow key={row.id}>
                 {row.getAllCells().map((cell) => (
-                  <TableCell key={cell.id} className="py-3 first:pl-5 last:pr-5">
+                  <TableCell
+                    key={cell.id}
+                    className={cn(
+                      "py-3 first:pl-5 last:pr-5",
+                      (cell.column.columnDef.meta as ColumnMeta | undefined)?.className,
+                    )}
+                  >
                     <table.FlexRender cell={cell} />
                   </TableCell>
                 ))}
@@ -159,8 +175,8 @@ export function DocumentsTable({ rows, filters }: { rows: DocumentListRow[]; fil
         </Table>
       </div>
 
-      {/* Móvil: tarjetas */}
-      <ul className="space-y-3 md:hidden">
+      {/* Celular y tablet: tarjetas (dos columnas desde sm) */}
+      <ul className="grid gap-3 sm:grid-cols-2 xl:hidden">
         {rows.map((row) => (
           <li key={row.id} className="rounded-2xl border bg-card p-4 shadow-soft">
             <div className="mb-2 flex flex-wrap items-center gap-2">

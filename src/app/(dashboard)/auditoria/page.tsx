@@ -125,11 +125,11 @@ type AuditRow = {
   mobileDetail?: React.ReactNode;
 };
 
-/** Tabla en pantallas medianas y grandes; tarjetas apiladas en celular. */
+/** Tabla desde xl; tarjetas en celular y tablet (la tabla no cabe bajo ~830 px de ancho útil). */
 function AuditList({ headers, rows }: { headers: [string, string, string, string]; rows: AuditRow[] }) {
   return (
     <>
-      <div className="hidden overflow-x-auto rounded-2xl border bg-card shadow-soft md:block">
+      <div className="hidden overflow-x-auto rounded-2xl border bg-card shadow-soft xl:block">
         <Table>
           <TableHeader>
             <TableRow className="bg-secondary-soft/50 hover:bg-secondary-soft/50">
@@ -160,7 +160,7 @@ function AuditList({ headers, rows }: { headers: [string, string, string, string
         </Table>
       </div>
 
-      <ul className="space-y-3 md:hidden">
+      <ul className="grid gap-3 sm:grid-cols-2 xl:hidden">
         {rows.map((row) => (
           <li key={row.id} className="space-y-1 rounded-2xl border bg-card p-4 shadow-soft">
             <p className="text-xs text-muted-foreground tabular-nums">{formatDateTime(row.date)}</p>
