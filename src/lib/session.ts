@@ -13,6 +13,7 @@ export type CurrentUser = {
   fullName: string;
   email: string;
   role: Role;
+  avatarKey: string | null;
 };
 
 /**
@@ -27,11 +28,17 @@ export const getCurrentUser = cache(async (): Promise<CurrentUser | null> => {
 
   const user = await prisma.user.findUnique({
     where: { id: userId },
-    select: { id: true, fullName: true, email: true, role: true, isActive: true },
+    select: { id: true, fullName: true, email: true, role: true, avatarKey: true, isActive: true },
   });
   if (!user || !user.isActive) return null;
 
-  return { id: user.id, fullName: user.fullName, email: user.email, role: user.role };
+  return {
+    id: user.id,
+    fullName: user.fullName,
+    email: user.email,
+    role: user.role,
+    avatarKey: user.avatarKey,
+  };
 });
 
 /** Para Server Components y Server Actions: redirige a /login si no hay sesión válida. */

@@ -1,9 +1,10 @@
 "use client";
 
 import { createColumnHelper, tableFeatures, useTable } from "@tanstack/react-table";
-import { ArrowDown, ArrowUp, ArrowUpDown, Download, Eye, User } from "lucide-react";
+import { ArrowDown, ArrowUp, ArrowUpDown, Download, Eye } from "lucide-react";
 import Link from "next/link";
 
+import { UserChip } from "@/components/shared/user-avatar";
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { formatCalendarDate } from "@/lib/dates";
@@ -37,7 +38,12 @@ const columns = column.columns([
           {row.original.title}
         </Link>
         {/* Mientras la columna Autor está oculta, el autor va bajo el título. */}
-        <span className="block text-xs text-muted-foreground 2xl:hidden">{row.original.authorName}</span>
+        <UserChip
+          fullName={row.original.authorName}
+          src={row.original.authorAvatar}
+          size="xs"
+          className="mt-1 flex text-xs text-muted-foreground 2xl:hidden"
+        />
       </>
     ),
   }),
@@ -61,6 +67,9 @@ const columns = column.columns([
   column.accessor("authorName", {
     header: "Autor",
     meta: { sortField: "author", className: "hidden 2xl:table-cell" },
+    cell: ({ row }) => (
+      <UserChip fullName={row.original.authorName} src={row.original.authorAvatar} className="max-w-48" />
+    ),
   }),
   column.accessor("status", {
     header: "Estado",
@@ -193,10 +202,11 @@ export function DocumentsTable({ rows, filters }: { rows: DocumentListRow[]; fil
               Folio {row.folio} · {formatCalendarDate(row.documentDate)}
             </p>
             <div className="mt-3 flex items-center justify-between gap-2">
-              <span className="flex min-w-0 items-center gap-1.5 text-sm text-muted-foreground">
-                <User className="size-3.5 shrink-0" />
-                <span className="truncate">{row.authorName}</span>
-              </span>
+              <UserChip
+                fullName={row.authorName}
+                src={row.authorAvatar}
+                className="text-sm text-muted-foreground"
+              />
               <RowActions row={row} />
             </div>
           </li>

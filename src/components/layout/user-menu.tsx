@@ -3,7 +3,7 @@
 import { ChevronDown, LogOut, UserRound } from "lucide-react";
 import Link from "next/link";
 
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { UserAvatar } from "@/components/shared/user-avatar";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -16,27 +16,14 @@ import {
 import { ROLE_LABELS, type Role } from "@/lib/roles";
 import { logoutAction } from "@/server/actions/auth";
 
-function initials(name: string) {
-  return name
-    .split(" ")
-    .filter(Boolean)
-    .slice(0, 2)
-    .map((part) => part[0]?.toUpperCase())
-    .join("");
-}
+type Props = { fullName: string; email: string; role: Role; avatarSrc: string | null };
 
-type Props = { fullName: string; email: string; role: Role };
-
-export function UserMenu({ fullName, email, role }: Props) {
+export function UserMenu({ fullName, email, role, avatarSrc }: Props) {
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
         <Button variant="ghost" className="h-auto gap-3 rounded-xl px-2 py-1.5">
-          <Avatar className="size-9">
-            <AvatarFallback className="bg-secondary-soft font-semibold text-foreground">
-              {initials(fullName)}
-            </AvatarFallback>
-          </Avatar>
+          <UserAvatar fullName={fullName} src={avatarSrc} className="size-9" />
           <span className="hidden text-left leading-tight sm:block">
             <span className="block text-sm font-semibold">{fullName}</span>
             <span className="block text-xs text-muted-foreground">{ROLE_LABELS[role]}</span>

@@ -1,22 +1,34 @@
 "use client";
 
 import { zodResolver } from "@hookform/resolvers/zod";
-import { KeyRound, Save } from "lucide-react";
-import { useTransition } from "react";
+import { Camera, KeyRound, Save, Trash2 } from "lucide-react";
+import { useRef, useTransition } from "react";
 import { useForm } from "react-hook-form";
 import { toast } from "sonner";
 
+import { UserAvatar } from "@/components/shared/user-avatar";
 import { Button } from "@/components/ui/button";
 import { Field, FieldDescription, FieldError, FieldGroup, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { Spinner } from "@/components/ui/spinner";
+import {
+  AVATAR_SIZE,
+  AVATAR_SOURCE_ACCEPT,
+  MAX_AVATAR_SOURCE_SIZE,
+  MAX_AVATAR_UPLOAD_SIZE,
+} from "@/lib/avatar";
 import {
   changePasswordSchema,
   profileSchema,
   type ChangePasswordInput,
   type ProfileInput,
 } from "@/lib/validations/user";
-import { changePasswordAction, updateProfileAction } from "@/server/actions/users";
+import {
+  changePasswordAction,
+  removeAvatarAction,
+  updateAvatarAction,
+  updateProfileAction,
+} from "@/server/actions/users";
 
 export function ProfileForm({ phone }: { phone: string }) {
   const [isPending, startTransition] = useTransition();
@@ -113,5 +125,116 @@ export function ChangePasswordForm() {
         {isPending ? <Spinner /> : <KeyRound />} Cambiar contraseña
       </Button>
     </form>
+  );
+}
+
+/** Recorta la imagen al centro, la reduce a AVATAR_SIZE px y la convierte a JPEG. */
+async function toAvatarJpeg(file: File): Promise<Blob> {
+  const bitmap = await createImageBitmap(file);
+  const side = Math.min(bitmap.width, bitmap.height);
+  const canvas = document.createElement("canvas");
+  canvas.width = AVATAR_SIZE;
+  canvas.height = AVATAR_SIZE;
+  const context = canvas.getContext("2d")!;
+  // Fondo blanco: las zonas transparentes de un PNG no quedan negras en el JPEG.
+  context.fillStyle = "#ffffff";
+  context.fillRect(0, 0, AVATAR_SIZE, AVATAR_SIZE);
+  context.drawImage(
+    bitmap,
+    (bitmap.width - side) / 2,
+    (bitmap.height - side) / 2,
+    side,
+    side,
+    0,
+    0,
+    AVATAR_SIZE,
+    AVATAR_SIZE,
+  );
+  bitmap.close();
+  return new Promise((resolve, reject) =>
+    canvas.toBlob((blob) => (blob ? resolve(blob) : reject(new Error("toBlob"))), "image/jpeg", 0.88),
+  );
+}
+
+type AvatarFormProps = { fullName: string; src: string | null };
+
+export function AvatarForm({ fullName, src }: AvatarFormProps) {
+  const [isPending, startTransition] = useTransition();
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  function upload(file: File) {
+    if (!AVATAR_SOURCE_ACCEPT.split(",").includes(file.type)) {
+      toast.error("Usa una imagen JPG, PNG o WebP");
+      return;
+    }
+    if (file.size > MAX_AVATAR_SOURCE_SIZE) {
+      toast.error("La imagen supera los 15 MB");
+      return;
+    }
+    startTransition(async () => {
+      let jpeg: Blob;
+      try {
+        jpeg = await toAvatarJpeg(file);
+      } catch {
+        toast.error("No pudimos leer esa imagen");
+        return;
+      }
+      if (jpeg.size > MAX_AVATAR_UPLOAD_SIZE) {
+        toast.error("La imagen es demasiado grande");
+        return;
+      }
+      const formData = new FormData();
+      formData.set("avatar", jpeg, "avatar.jpg");
+      const result = await updateAvatarAction(formData);
+      if (result.ok) toast.success("Foto de perfil actualizada");
+      else toast.error(result.error);
+    });
+  }
+
+  function remove() {
+    startTransition(async () => {
+      const result = await removeAvatarAction();
+      if (result.ok) toast.success("Foto de perfil eliminada");
+      else toast.error(result.error);
+    });
+  }
+
+  return (
+    <div className="flex flex-col items-center gap-5 sm:flex-row">
+      <UserAvatar fullName={fullName} src={src} className="size-24" fallbackClassName="text-2xl" />
+      <div className="flex flex-col items-center gap-3 sm:items-start">
+        <p className="text-center text-sm text-muted-foreground sm:text-left">
+          JPG, PNG o WebP. Se recorta en forma cuadrada, al centro de la imagen.
+        </p>
+        <div className="flex flex-wrap justify-center gap-2">
+          <input
+            ref={inputRef}
+            type="file"
+            accept={AVATAR_SOURCE_ACCEPT}
+            className="sr-only"
+            tabIndex={-1}
+            aria-hidden
+            onChange={(event) => {
+              const file = event.target.files?.[0];
+              event.target.value = "";
+              if (file) upload(file);
+            }}
+          />
+          <Button
+            type="button"
+            variant="secondary"
+            disabled={isPending}
+            onClick={() => inputRef.current?.click()}
+          >
+            {isPending ? <Spinner /> : <Camera />} {src ? "Cambiar foto" : "Subir foto"}
+          </Button>
+          {src && (
+            <Button type="button" variant="ghost" disabled={isPending} onClick={remove}>
+              <Trash2 /> Quitar
+            </Button>
+          )}
+        </div>
+      </div>
+    </div>
   );
 }

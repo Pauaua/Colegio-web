@@ -22,6 +22,7 @@ import {
   DeleteDocumentButton,
 } from "@/components/documents/document-actions";
 import { EmptyState } from "@/components/shared/empty-state";
+import { AuthorChip } from "@/components/shared/user-avatar";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -165,7 +166,11 @@ export default async function DocumentDetailPage({ params }: PageProps<"/documen
                   label="Fecha del documento"
                   value={formatCalendarDate(doc.documentDate)}
                 />
-                <MetaRow icon={UserRound} label="Autor(a)" value={doc.author.fullName} />
+                <MetaRow
+                  icon={UserRound}
+                  label="Autor(a)"
+                  value={<AuthorChip author={doc.author} className="mt-1 flex" />}
+                />
                 <MetaRow icon={CalendarDays} label="Subido el" value={formatDateTime(doc.createdAt)} />
                 <MetaRow
                   icon={FileText}
@@ -277,7 +282,7 @@ function MetaRow({
 }: {
   icon: React.ComponentType<{ className?: string }>;
   label: string;
-  value: string;
+  value: React.ReactNode;
 }) {
   return (
     <div className="flex gap-3">

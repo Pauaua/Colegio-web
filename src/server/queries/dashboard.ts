@@ -24,7 +24,7 @@ const documentCardSelect = {
   requiresAcknowledgement: true,
   citationAt: true,
   documentType: { select: { name: true, color: true } },
-  author: { select: { fullName: true } },
+  author: { select: { id: true, fullName: true, avatarKey: true } },
 } as const;
 
 /** Citación vigente dirigida a un apoderado que todavía no responde. */

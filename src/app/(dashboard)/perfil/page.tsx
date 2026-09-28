@@ -2,9 +2,10 @@ import { GraduationCap } from "lucide-react";
 import type { Metadata } from "next";
 
 import { SectionCard } from "@/components/dashboard/widgets";
-import { ChangePasswordForm, ProfileForm } from "@/components/profile/profile-forms";
+import { AvatarForm, ChangePasswordForm, ProfileForm } from "@/components/profile/profile-forms";
 import { PageHeader } from "@/components/shared/page-header";
 import { RoleBadge } from "@/components/users/badges";
+import { avatarUrl } from "@/lib/avatar";
 import { formatDateTime } from "@/lib/dates";
 import { prisma } from "@/lib/prisma";
 import { formatRut } from "@/lib/rut";
@@ -18,6 +19,7 @@ export default async function ProfilePage() {
     where: { id: current.id },
     select: {
       fullName: true,
+      avatarKey: true,
       email: true,
       rut: true,
       role: true,
@@ -31,6 +33,10 @@ export default async function ProfilePage() {
     <>
       <PageHeader title="Mi perfil" description="Tus datos de acceso y contacto." />
       <div className="grid max-w-4xl gap-6">
+        <SectionCard title="Foto de perfil" description="Se muestra junto a tu nombre en la plataforma.">
+          <AvatarForm fullName={user.fullName} src={avatarUrl(current.id, user.avatarKey)} />
+        </SectionCard>
+
         <SectionCard
           title="Mis datos"
           description="Si necesitas corregir tu nombre, RUT o correo, pídeselo a la dirección."

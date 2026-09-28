@@ -62,6 +62,7 @@ model User {
   passwordHash String
   role         Role
   phone        String?
+  avatarKey    String? // foto de perfil en storage: avatars/{uuid}.jpg
   isActive     Boolean  @default(true)
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt

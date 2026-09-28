@@ -6,6 +6,7 @@ import { CitationResponseBadge } from "@/components/citations/citation-badges";
 import { DocumentStatusBadge, DocumentTypeBadge } from "@/components/documents/badges";
 import { AcknowledgeButton } from "@/components/documents/document-actions";
 import { EmptyState } from "@/components/shared/empty-state";
+import { AuthorChip } from "@/components/shared/user-avatar";
 import { PageHeader } from "@/components/shared/page-header";
 import { Button } from "@/components/ui/button";
 import { formatCalendarDate, formatDateTime } from "@/lib/dates";
@@ -112,10 +113,14 @@ export default async function InboxPage({ searchParams }: PageProps<"/mis-docume
                   >
                     {doc.title}
                   </Link>
-                  <p className="text-sm text-muted-foreground">
-                    {formatCalendarDate(doc.documentDate)} · Folio {doc.folioNumber}/{doc.folioYear} ·{" "}
-                    {doc.author.fullName}
-                    {doc.courses.length > 0 && ` · Curso ${doc.courses.map((c) => c.course.name).join(", ")}`}
+                  <p className="flex flex-wrap items-center gap-x-1.5 gap-y-1 text-sm text-muted-foreground">
+                    <span>
+                      {formatCalendarDate(doc.documentDate)} · Folio {doc.folioNumber}/{doc.folioYear} ·
+                    </span>
+                    <AuthorChip author={doc.author} />
+                    {doc.courses.length > 0 && (
+                      <span>· Curso {doc.courses.map((c) => c.course.name).join(", ")}</span>
+                    )}
                   </p>
                 </div>
                 <div className="shrink-0">

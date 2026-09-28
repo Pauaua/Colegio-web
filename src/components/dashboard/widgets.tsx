@@ -2,6 +2,7 @@ import type { LucideIcon } from "lucide-react";
 import Link from "next/link";
 
 import { DocumentStatusBadge, DocumentTypeBadge } from "@/components/documents/badges";
+import { AuthorChip } from "@/components/shared/user-avatar";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { formatCalendarDate } from "@/lib/dates";
 import { cn } from "@/lib/utils";
@@ -65,7 +66,7 @@ export type MiniDocument = {
   documentDate: Date;
   status: "VIGENTE" | "ARCHIVADO";
   documentType: { name: string; color: string };
-  author: { fullName: string };
+  author: { id: string; fullName: string; avatarKey: string | null };
 };
 
 export function DocumentMiniList<T extends MiniDocument>({
@@ -95,7 +96,7 @@ export function DocumentMiniList<T extends MiniDocument>({
               <DocumentTypeBadge name={doc.documentType.name} color={doc.documentType.color} />
               <span>{formatCalendarDate(doc.documentDate)}</span>
               <span>·</span>
-              <span className="truncate">{doc.author.fullName}</span>
+              <AuthorChip author={doc.author} size="xs" />
               {doc.status === "ARCHIVADO" && <DocumentStatusBadge status={doc.status} />}
             </div>
           </div>

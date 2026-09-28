@@ -6,6 +6,7 @@ import { CitationResponseBadge, CitationWhenWhere } from "@/components/citations
 import { DocumentStatusBadge } from "@/components/documents/badges";
 import { EmptyState } from "@/components/shared/empty-state";
 import { PageHeader } from "@/components/shared/page-header";
+import { AuthorChip } from "@/components/shared/user-avatar";
 import { Button } from "@/components/ui/button";
 import { isManagement } from "@/lib/permissions";
 import { requirePermission } from "@/lib/session";
@@ -83,7 +84,12 @@ export default async function CitationsPage({ searchParams }: PageProps<"/citaci
                     <span>
                       Folio {c.folioNumber}/{c.folioYear}
                     </span>
-                    {showAuthor && <span>· {c.author.fullName}</span>}
+                    {showAuthor && (
+                      <>
+                        <span>·</span>
+                        <AuthorChip author={c.author} size="xs" />
+                      </>
+                    )}
                     {c.courses.length > 0 && <span>· {c.courses.map((x) => x.course.name).join(", ")}</span>}
                     {c.status === "ARCHIVADO" && <DocumentStatusBadge status={c.status} />}
                   </div>

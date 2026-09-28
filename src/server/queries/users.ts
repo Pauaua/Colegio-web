@@ -4,6 +4,7 @@ import { z } from "zod";
 
 import type { Prisma } from "@/generated/prisma/client";
 import type { Role } from "@/generated/prisma/enums";
+import { avatarUrl } from "@/lib/avatar";
 import { prisma } from "@/lib/prisma";
 import { ROLES } from "@/lib/roles";
 
@@ -37,6 +38,7 @@ export type UserListRow = {
   role: (typeof ROLES)[number];
   phone: string | null;
   isActive: boolean;
+  avatar: string | null;
 };
 
 /** Lista paginada. Con `roles`, se limita a esos roles (el filtro `rol` solo acota dentro de ellos). */
@@ -63,11 +65,25 @@ export async function listUsers(filters: UserFilters, roles?: readonly Role[]) {
       orderBy: [{ isActive: "desc" }, { fullName: "asc" }],
       skip: (filters.page - 1) * USERS_PAGE_SIZE,
       take: USERS_PAGE_SIZE,
-      select: { id: true, fullName: true, email: true, rut: true, role: true, phone: true, isActive: true },
+      select: {
+        id: true,
+        fullName: true,
+        email: true,
+        rut: true,
+        role: true,
+        phone: true,
+        isActive: true,
+        avatarKey: true,
+      },
     }),
   ]);
 
-  return { rows: users as UserListRow[], total, pageCount: Math.max(1, Math.ceil(total / USERS_PAGE_SIZE)) };
+  const rows: UserListRow[] = users.map(({ avatarKey, ...user }) => ({
+    ...user,
+    avatar: avatarUrl(user.id, avatarKey),
+  }));
+
+  return { rows, total, pageCount: Math.max(1, Math.ceil(total / USERS_PAGE_SIZE)) };
 }
 
 /** Cantidad de usuarios por rol, total y activos. */

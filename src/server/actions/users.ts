@@ -1,12 +1,17 @@
 "use server";
 
+import { randomUUID } from "node:crypto";
+
 import bcrypt from "bcryptjs";
 import { revalidatePath } from "next/cache";
 
 import { logAudit } from "@/lib/audit";
+import { buildAvatarKey, MAX_AVATAR_UPLOAD_SIZE } from "@/lib/avatar";
+import { matchesMagicBytes } from "@/lib/files";
 import { prisma } from "@/lib/prisma";
 import { normalizeRut } from "@/lib/rut";
 import { authorize } from "@/lib/session";
+import { deleteFile, putFile } from "@/lib/storage";
 import {
   changePasswordSchema,
   createUserSchema,
@@ -390,5 +395,57 @@ export async function changePasswordAction(input: unknown): Promise<ActionResult
     });
     await logAudit({ userId: actor.id, action: "CHANGE_PASSWORD", entity: "User", entityId: actor.id }, tx);
   });
+  return { ok: true };
+}
+
+// ─── Foto de perfil ─────────────────────────────────────────────────────
+
+/** Recibe el JPEG ya recortado y reducido en el navegador (campo "avatar"). */
+export async function updateAvatarAction(formData: FormData): Promise<ActionResult> {
+  let actor;
+  try {
+    actor = await authorize();
+  } catch (error) {
+    return authFailure(error);
+  }
+
+  const file = formData.get("avatar");
+  if (!(file instanceof File) || file.size === 0) return { ok: false, error: "Selecciona una imagen" };
+  if (file.size > MAX_AVATAR_UPLOAD_SIZE) return { ok: false, error: "La imagen es demasiado grande" };
+
+  const body = Buffer.from(await file.arrayBuffer());
+  // El tipo declarado por el cliente no basta: se revisa el contenido real.
+  if (!matchesMagicBytes(body, "image/jpeg")) return { ok: false, error: "La imagen no es válida" };
+
+  const key = buildAvatarKey(randomUUID());
+  await putFile(key, body, "image/jpeg");
+
+  const previous = await prisma.user.findUniqueOrThrow({
+    where: { id: actor.id },
+    select: { avatarKey: true },
+  });
+  await prisma.user.update({ where: { id: actor.id }, data: { avatarKey: key } });
+  if (previous.avatarKey) await deleteFile(previous.avatarKey).catch(() => undefined);
+
+  // La foto aparece en la barra superior de todas las páginas.
+  revalidatePath("/", "layout");
+  return { ok: true };
+}
+
+export async function removeAvatarAction(): Promise<ActionResult> {
+  let actor;
+  try {
+    actor = await authorize();
+  } catch (error) {
+    return authFailure(error);
+  }
+
+  const user = await prisma.user.findUniqueOrThrow({ where: { id: actor.id }, select: { avatarKey: true } });
+  if (!user.avatarKey) return { ok: true };
+
+  await prisma.user.update({ where: { id: actor.id }, data: { avatarKey: null } });
+  await deleteFile(user.avatarKey).catch(() => undefined);
+
+  revalidatePath("/", "layout");
   return { ok: true };
 }

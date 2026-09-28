@@ -7,6 +7,7 @@ import { useRouter } from "next/navigation";
 import { useTransition } from "react";
 import { toast } from "sonner";
 
+import { UserChip } from "@/components/shared/user-avatar";
 import { Button } from "@/components/ui/button";
 import { Spinner } from "@/components/ui/spinner";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -52,15 +53,17 @@ export function UsersTable({ rows, currentUserId }: { rows: UserListRow[]; curre
     column.accessor("fullName", {
       header: "Nombre",
       cell: ({ row }) => (
-        <div className="min-w-0">
-          <Link
-            href={`/usuarios/${row.original.id}`}
-            className="font-semibold underline-offset-4 hover:underline"
-          >
-            {row.original.fullName}
-          </Link>
-          <p className="truncate text-xs text-muted-foreground">{row.original.email}</p>
-        </div>
+        <UserChip fullName={row.original.fullName} src={row.original.avatar} size="md" className="flex">
+          <span className="min-w-0">
+            <Link
+              href={`/usuarios/${row.original.id}`}
+              className="font-semibold underline-offset-4 hover:underline"
+            >
+              {row.original.fullName}
+            </Link>
+            <span className="block truncate text-xs text-muted-foreground">{row.original.email}</span>
+          </span>
+        </UserChip>
       ),
     }),
     column.accessor("rut", {
@@ -130,12 +133,19 @@ export function UsersTable({ rows, currentUserId }: { rows: UserListRow[]; curre
               <RoleBadge role={user.role} />
               <UserStatusBadge active={user.isActive} />
             </div>
-            <Link href={`/usuarios/${user.id}`} className="font-semibold underline-offset-4 hover:underline">
-              {user.fullName}
-            </Link>
-            <p className="text-sm text-muted-foreground">
-              {user.email} · {formatRut(user.rut)}
-            </p>
+            <UserChip fullName={user.fullName} src={user.avatar} size="md" className="flex">
+              <span className="min-w-0">
+                <Link
+                  href={`/usuarios/${user.id}`}
+                  className="font-semibold underline-offset-4 hover:underline"
+                >
+                  {user.fullName}
+                </Link>
+                <span className="block text-sm break-all text-muted-foreground">
+                  {user.email} · {formatRut(user.rut)}
+                </span>
+              </span>
+            </UserChip>
             <div className="mt-2 flex justify-end">
               <ToggleActiveButton user={user} disabled={user.id === currentUserId} />
             </div>

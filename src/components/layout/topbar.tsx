@@ -1,4 +1,5 @@
 import { Logo } from "@/components/shared/logo";
+import { avatarUrl } from "@/lib/avatar";
 import type { CurrentUser } from "@/lib/session";
 
 import { MobileNav } from "./mobile-nav";
@@ -12,7 +13,12 @@ export function Topbar({ user }: { user: CurrentUser }) {
       <Logo compact className="lg:hidden" />
       <div className="ml-auto flex items-center gap-1">
         <ThemeToggle />
-        <UserMenu fullName={user.fullName} email={user.email} role={user.role} />
+        <UserMenu
+          fullName={user.fullName}
+          email={user.email}
+          role={user.role}
+          avatarSrc={avatarUrl(user.id, user.avatarKey)}
+        />
       </div>
     </header>
   );

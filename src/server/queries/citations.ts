@@ -40,7 +40,7 @@ export async function listSentCitations(user: CurrentUser, tab: CitationTab) {
         citationAt: true,
         citationPlace: true,
         status: true,
-        author: { select: { fullName: true } },
+        author: { select: { id: true, fullName: true, avatarKey: true } },
         courses: { select: { course: { select: { name: true } } } },
         recipients: {
           orderBy: { user: { fullName: "asc" } },

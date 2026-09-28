@@ -32,6 +32,10 @@ export const DOWNLOAD_URL_TTL_SECONDS = 5 * 60;
 export const FILE_KEY_PATTERN =
   /^documents\/\d{4}\/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}-[a-z0-9-]{1,80}\.[a-z0-9]{2,5}$/;
 
+/** avatars/{uuid}.jpg — fotos de perfil, siempre reprocesadas a JPEG en el navegador. */
+export const AVATAR_KEY_PATTERN =
+  /^avatars\/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\.jpg$/;
+
 export type UploadTarget = { url: string; method: "PUT"; headers: Record<string, string> };
 export type FileInfo = { size: number; contentType: string | null };
 export type DownloadOptions = {
@@ -51,7 +55,9 @@ interface StorageDriver {
 }
 
 function assertValidKey(key: string) {
-  if (!FILE_KEY_PATTERN.test(key)) throw new Error(`Clave de archivo inválida: ${key}`);
+  if (!FILE_KEY_PATTERN.test(key) && !AVATAR_KEY_PATTERN.test(key)) {
+    throw new Error(`Clave de archivo inválida: ${key}`);
+  }
 }
 
 /** Content-Disposition con nombre ASCII de respaldo y nombre UTF-8 (RFC 6266). */

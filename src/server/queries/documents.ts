@@ -1,6 +1,7 @@
 import "server-only";
 
 import type { Prisma } from "@/generated/prisma/client";
+import { avatarUrl } from "@/lib/avatar";
 import { CITATION_TYPE_CODE } from "@/lib/citations";
 import { DOCUMENTS_PAGE_SIZE, type DocumentFilters, type DocumentSortField } from "@/lib/document-filters";
 import { buildDocumentWhere, canViewDocument, roleCan, type DocumentForPermission } from "@/lib/permissions";
@@ -113,6 +114,7 @@ export type DocumentListRow = {
   typeColor: string;
   documentDate: string;
   authorName: string;
+  authorAvatar: string | null;
   status: "VIGENTE" | "ARCHIVADO";
   mimeType: string;
   requiresAcknowledgement: boolean;
@@ -141,7 +143,7 @@ export async function listDocuments(user: CurrentUser, filters: DocumentFilters)
         mimeType: true,
         requiresAcknowledgement: true,
         documentType: { select: { name: true, color: true } },
-        author: { select: { fullName: true } },
+        author: { select: { id: true, fullName: true, avatarKey: true } },
       },
     }),
   ]);
@@ -154,6 +156,7 @@ export async function listDocuments(user: CurrentUser, filters: DocumentFilters)
     typeColor: doc.documentType.color,
     documentDate: doc.documentDate.toISOString(),
     authorName: doc.author.fullName,
+    authorAvatar: avatarUrl(doc.author.id, doc.author.avatarKey),
     status: doc.status,
     mimeType: doc.mimeType,
     requiresAcknowledgement: doc.requiresAcknowledgement,
@@ -183,7 +186,7 @@ export async function getDocumentDetail(documentId: string, user: CurrentUser) {
     where: { id: documentId },
     include: {
       documentType: true,
-      author: { select: { id: true, fullName: true } },
+      author: { select: { id: true, fullName: true, avatarKey: true } },
       visibility: { select: { role: true } },
       recipients: {
         select: {
@@ -286,7 +289,7 @@ export async function getInbox(user: CurrentUser, filter: InboxFilter) {
             requiresAcknowledgement: true,
             status: true,
             documentType: { select: { name: true, color: true } },
-            author: { select: { fullName: true } },
+            author: { select: { id: true, fullName: true, avatarKey: true } },
             courses: { select: { course: { select: { name: true } } } },
           },
         },
