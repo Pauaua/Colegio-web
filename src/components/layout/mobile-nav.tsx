@@ -20,7 +20,7 @@ export function MobileNav({ role }: { role: Role }) {
           <Menu className="size-5" />
         </Button>
       </SheetTrigger>
-      <SheetContent side="left" className="w-72 gap-8 bg-brand-gradient p-5">
+      <SheetContent side="left" className="w-72 gap-8 bg-sidebar-glow p-5">
         <SheetTitle className="sr-only">Menú</SheetTitle>
         <SheetDescription className="sr-only">Navegación principal</SheetDescription>
         <Logo className="px-1" />

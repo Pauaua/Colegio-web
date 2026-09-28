@@ -94,6 +94,11 @@
   --input: #dfdcd3;
   --ring: #9fb3d8;
   --gradient: linear-gradient(160deg, #e2e9f5 0%, #eef0f4 55%, #f5ecd6 100%);
+  /* Brillos suaves sobre el degradado de la barra lateral: dorado y marino muy diluidos. */
+  --sidebar-glow:
+    radial-gradient(circle at 85% 6%, rgb(236 217 166 / 0.55), transparent 42%),
+    radial-gradient(circle at 8% 48%, rgb(255 255 255 / 0.7), transparent 38%),
+    radial-gradient(circle at 90% 92%, rgb(185 201 230 / 0.45), transparent 45%);
   /* Texto sobre las etiquetas pastel de tipo de documento (mismo en ambos modos). */
   --tag-foreground: #1f2d4f;
   /* Marca de gráficos de una serie: marino suave (4.88:1 sobre la tarjeta). */
@@ -145,6 +150,10 @@
   --input: #2e3e60;
   --ring: #93acd8;
   --gradient: linear-gradient(160deg, #15233f 0%, #121d34 55%, #231f1a 100%);
+  --sidebar-glow:
+    radial-gradient(circle at 85% 6%, rgb(212 168 58 / 0.12), transparent 42%),
+    radial-gradient(circle at 8% 48%, rgb(147 172 216 / 0.1), transparent 38%),
+    radial-gradient(circle at 90% 92%, rgb(212 168 58 / 0.08), transparent 45%);
   --tag-foreground: #1f2d4f;
   --chart-mark: #9fb4e0;
   --chart-grid: #283757;
@@ -167,6 +176,11 @@
 
 @utility bg-brand-gradient {
   background-image: var(--gradient);
+}
+
+/* Degradado de marca con brillos sutiles (barra lateral y menú móvil). */
+@utility bg-sidebar-glow {
+  background-image: var(--sidebar-glow), var(--gradient);
 }
 
 @utility shadow-soft {
