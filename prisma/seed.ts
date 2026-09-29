@@ -90,7 +90,7 @@ type SeedDocument = {
   visibleTo?: Role[];
   recipients?: UserKey[];
   acknowledgedBy?: UserKey[];
-  course?: "3B" | "1M";
+  course?: "3B" | "6B";
   requiresAck?: boolean;
   archived?: boolean;
 };
@@ -260,13 +260,13 @@ const DOCUMENTS: SeedDocument[] = [
     description: "Cambios aprobados al reglamento de evaluación y promoción.",
   },
   {
-    title: "Citación a reunión de apoderados de 1° Medio B",
+    title: "Citación a reunión de apoderados de 6° Básico B",
     type: "CITACION",
     date: [9, 15],
     author: "directivo",
-    course: "1M",
+    course: "6B",
     requiresAck: true,
-    description: "Reunión de apoderados para organizar la gira de estudios.",
+    description: "Reunión de apoderados para organizar el paseo de fin de año.",
   },
 ];
 
@@ -319,7 +319,7 @@ async function main() {
 
   console.log("🏫 Cursos y estudiantes…");
   const course3B = await prisma.course.create({ data: { name: "3° Básico A", year: YEAR } });
-  const course1M = await prisma.course.create({ data: { name: "1° Medio B", year: YEAR } });
+  const course6B = await prisma.course.create({ data: { name: "6° Básico B", year: YEAR } });
   await prisma.teacherCourse.create({ data: { teacherId: users.docente.id, courseId: course3B.id } });
 
   const students = [
@@ -339,11 +339,11 @@ async function main() {
     {
       fullName: "Benjamín Sepúlveda Mora",
       rutBody: 22345678,
-      courseId: course1M.id,
+      courseId: course6B.id,
       guardian: "apoderado2" as const,
     },
-    { fullName: "Isidora Tapia Núñez", rutBody: 22789012, courseId: course1M.id },
-    { fullName: "Vicente Araya León", rutBody: 22901234, courseId: course1M.id },
+    { fullName: "Isidora Tapia Núñez", rutBody: 22789012, courseId: course6B.id },
+    { fullName: "Vicente Araya León", rutBody: 22901234, courseId: course6B.id },
   ];
   for (const s of students) {
     const student = await prisma.student.create({
@@ -355,11 +355,11 @@ async function main() {
       });
     }
   }
-  const courseGuardians = { "3B": ["apoderado"], "1M": ["apoderado2"] } as const satisfies Record<
+  const courseGuardians = { "3B": ["apoderado"], "6B": ["apoderado2"] } as const satisfies Record<
     string,
     UserKey[]
   >;
-  const courseIds = { "3B": course3B.id, "1M": course1M.id };
+  const courseIds = { "3B": course3B.id, "6B": course6B.id };
 
   console.log(`📄 Documentos y archivos de muestra (storage: ${getStorageDriverName()})…`);
   const folioCounters = new Map<TypeCode, number>();

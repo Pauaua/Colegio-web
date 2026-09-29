@@ -9,7 +9,7 @@ export function Logo({ className, compact = false }: { className?: string; compa
     <div className={cn("flex items-center gap-3", className)}>
       <Image
         src={logo}
-        alt="Escuela F N° 732 Chorombo Alto"
+        alt="Escuela"
         // La versión compacta va en la barra superior (h-16), que no admite el tamaño completo.
         className={cn("shrink-0 rounded-full shadow-soft", compact ? "size-12" : "size-27")}
         sizes={compact ? "48px" : "108px"}
